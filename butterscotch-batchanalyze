@@ -1,0 +1,31 @@
+#!/usr/bin/env python
+
+import subprocess
+import audioprocessing
+import gdbm
+import pickle
+import wave
+
+dictionaryname = "data.gdbm"
+playlist = file("playlist.m3u")
+wavpath = "tmp.wav"
+
+files = [ s.strip() for s in playlist.readlines() if s.strip() ]
+dictionary = gdbm.open(dictionaryname,"c")
+
+for themp3 in files:
+	if not themp3.endswith(".mp3") or themp3.startswith("#"): continue
+	print "Processing",themp3
+	try: subprocess.check_call(["mpg321","-w",wavpath,themp3])
+	except Exception,e:
+		print themp3,"decoding failed: ",str(e),"- continuing to next file"
+		continue
+	try:
+		data = audioprocessing.wav_butterscotch(wavpath)
+		dictionary[themp3] = pickle.dumps(data)
+	except (IOError,OSError,wave.Error,NotImplementedError),e:
+		print themp3,"signature failed: ",str(e),"- continuing to next file"
+		continue
+	
+
+dictionary.close()

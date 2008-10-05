@@ -12,6 +12,6 @@ setup(
 	license = "GPL",
 	url = 'http://projects.rudd-o.com/python-audioprocessing',
 	packages = ['audioprocessing'],
-	scripts = ["butterscotch","butterscotch-correlate"],
+	scripts = ["butterscotch","butterscotch-correlate","butterscotch-batchanalyze"],
 	keywords = "audio signal processing fft spectrum analyzer",
 )
