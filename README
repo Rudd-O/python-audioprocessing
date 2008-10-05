@@ -1,0 +1,39 @@
+= Python Audio Processing
+
+This Python module contains a variety of convenience functions to
+process audio signals.
+
+It is free software distributed under the GPL version 3.
+
+You can find the latest news and versions of this software at:
+  http://projects.rudd-o.com/python-audioprocessing
+
+== What it requires ==
+
+Your computer must have these software packages:
+
+ 1. Python
+ 2. SciPy
+ 3. NumPy (python-numeric)
+
+All major distributions include these packages, either as default or
+in their package manager repositories.  You can get these things in
+a matter of minutes, so there's no excuse not to use this software.
+
+== How to install it ==
+
+  python setup.py install
+
+or
+
+  python setup.py bdist_rpm
+
+if you want packages for your operating system.
+
+== Help! ==
+
+Sure, we can use the help!  In our Web site:
+
+ * If you find a bug, please file it using the New Ticket button.
+ * If you have patches to contribute, please file a bug too (since we're using Git, chances are we'll be able to pull and push code right from the start).
+ * In fact, if you have any idea that you'd like to share with us, do so as well.  Add your proposal to a Proposals page!

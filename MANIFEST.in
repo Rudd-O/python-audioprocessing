@@ -1,0 +1,5 @@
+include MANIFEST.in
+include setup.cfg
+include README
+include COPYING
+include TODO
