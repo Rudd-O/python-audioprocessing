@@ -1,0 +1,58 @@
+#!/usr/bin/env python
+
+"""
+This program is part of the Python audio processing suite.
+
+Distributed under the GPL v3.  Copyright Manuel Amador (Rudd-O).
+"""
+
+import audioprocessing as a
+import pickle
+from optparse import OptionParser
+import wave
+import sys
+import os
+
+usage = """usage: %prog [options] file.wav [file2.wav...]
+
+This program calculates the Butterscotch signature of the supplied sound files.  A Butterscotch signature consists of at most six spectrum analyses, each performed on consecutive ten-second blocks of audio, starting from the onset of the first 2 dB RMS increase counted each ~11 milliseconds.
+
+Each spectrum analysis samples 64 equal-width frequency bands from the first significant band to 11.025 KHz (approximately).  Each sample represents the relative signal amplitude, with the reference 0 dB amplitude being equivalent 1.0.  Samples are not normalized to dB, but instead printed raw.
+
+Recoverable errors processing one or more files cause an exit code of 2, but processing continues to the next file.  Fatal errors cause an exit code of 1."""
+
+epilog = """This program only knows how to process 16-bit little-endian linear-encoded 44.100 KHz mono / stereo / multichannel RIFF WAVE files.  It also doesn't know how to read from standard input or named pipes, since it needs to perform a seek in the audio file."""
+parser = OptionParser(usage=usage,epilog=epilog)
+parser.add_option("-d","--decibel",help="Compute decibel (dB) levels instead of raw signal values.  Useful for plotting spectrums.", action="store_true",dest="use_dB")
+parser.add_option("-g","--fingerprint",help="Turn each sample into a character representation of itself, using decibel (dB) values. '0' means between 0 and -3 dB; each letter from a to z represents a -3 dB quanta.  Implies --decibel.", action="store_true",dest="fingerprint")
+parser.add_option("-s","--full-spectrum",help="Compute the full spectrum below the Nyquist frequency instead of just up to 11025 Hz.  Useful to plot the full spectrum, and to compare high frequency loss in lossly encoded files.  You can combine it with --fingerprint to get a quick ASCII representation of frequency bands.", action="store_true",dest="full_spectrum")
+parser.add_option("-p","--pickle",help="Output a pickled representation of a dictionary with the file names as keys and {signal_onset,signature} as values.  If you're interfacing programmatically with this program from another Python program , you should read this output and load it with the pickle module.", action="store_true",dest="pickled")
+options,args = parser.parse_args()
+
+
+if not args:
+	parser.print_help()
+	sys.exit(os.EX_USAGE)
+
+dict = {}
+onefilefailed = False
+for arg in args:
+	try:
+		outputdb = options.use_dB or options.fingerprint
+		signal_onset,signature =a.wav_butterscotch(arg,use_dB=outputdb,full_spectrum=options.full_spectrum)
+		if options.fingerprint:
+			signature = [ a.dB_to_string(row) for row in signature ]
+		if options.pickled: dict[arg] = {
+				"signal_onset":signal_onset,
+				"signature":signature
+			}
+		else:
+			print "%s"%arg
+			print "Signal onset at sample %d"%signal_onset
+			for row in signature: print str(row)
+	except (IOError,OSError,wave.Error,NotImplementedError),e:
+		onefilefailed = True
+		sys.stderr.write("%s: %s\n"%(arg,str(e)))
+		sys.stderr.flush()
+if options.pickled: print pickle.dumps(dict),
+if onefilefailed: sys.exit(2)

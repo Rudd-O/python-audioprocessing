@@ -1,1 +1,6 @@
-No outstanding items yet.
+Things to do:
+
+* write an algorithm that combines the phase beat detector and a time-domain beat detector for best results, and write a program that uses it and writes the TBPM tag on mp3
+* now that we know the FFT code is solid, we can perhaps apply the bark scale to get the appropriate buckets from the FFT, so we can compare songs
+* for a song comparison plugin for Amarok, think about the database structure that will contain these 10 second 6 buckets of spectrum amplitude
+* tune correlation thresholds in butterscotch-correlate

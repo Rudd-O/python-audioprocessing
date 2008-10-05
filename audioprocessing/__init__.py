@@ -1,46 +1,85 @@
 #!/usr/bin/env python
 
 import numpy
-import wave
 import array
-import alsaaudio
 import scipy
 import scipy.signal
 import math
 import sys
-import time
-import matplotlib
-import pickle
+import wave
 
-def chunk_stream(stream,samples):
+"""
+Python audio processing suite
+
+This is a toolkit of convenience functions for audio processing.
+Distributed under the GPL v3.  Copyright Manuel Amador (Rudd-O).
+"""
+
+
+def chunked(stream,samples):
+	"""Given a sequence, returns it in chunks of len(samples) or less"""
 	offset = 0
 	while offset < len(stream):
 		yield stream[offset:offset+samples]
 		offset = offset + samples
 
 
-def mixdown(stereosignal,channels):
+def mix_down(stereosignal,channels):
+	"""Given a 1D numpy array where samples from each channel are
+	interspersed like this:
+		LRLRLRLRLRLR (stereo)
+	or
+		123456123456 (5.1)
+	returns the mono mixdown of the signal.
+	
+	Resulting stream is floating-point.  If channels=1, the stereo signal
+	is converted from int to float but no other changes take place.
+	"""
+	if channels == 1: return stereosignal * 1.
 	shape = (len(stereosignal)/channels,channels)
 	return stereosignal.reshape(shape).sum(1) / float(channels)
 
-def average(series): return sum(series) / float(len(series))
+
+def average(series):
+	"""Given a series of numbers, return their average
+	in floating point."""
+	return sum(series) / float(len(series))
+
 
 def calculate_rms(chunk):
+	"""Given a numpy array, return its RMS power level
+	in floating point.  Returns the absolute of the same value (in FP)
+	if given only one sample.
+	"""
 	try: len(chunk)
 	except TypeError: chunk = numpy.array([chunk])
 	chunk = pow(abs(chunk),2)
 	return math.sqrt ( average(chunk) )
 
-def calculate_rms_dB(chunk,max=32768):
-	return 10 * math.log10 ( calculate_rms(chunk) / float(max) )
 
-def find_first_nonsilence(samples,sampling_rate):
-	"""Finds the first 6 dB jump in the signal, then explores
-	the 20 milliseconds nearby and gets the sample offset
-	of the highest-powered 64-sample block."""
+def calculate_rms_dB(chunk,zero_dB_equiv=1.0):
+	"""Given a numpy array with a signal, calculate its RMS power level
+	and return it multiplied by ten.  The value is normalized by the
+	maximum value, so an RMS power level equal to max should
+	return 0 dB.  If a single sample is passed, the peak dB power level
+	of that sample is calculated instead."""
+	return 10 * math.log10 ( calculate_rms(chunk) / float(zero_dB_equiv) )
+
+calculate_dB = calculate_rms_dB
+
+
+def find_signal_onset(samples,sampling_rate):
+	"""Chunks the samples in 11.337 ms chunks (give or take a few samples)
+	calculates RMS power levels of each chunk, and compares each power
+	level to the previous one.
+	The first comparison that yields a greater-than-2-dB increase stops
+	the process, and returns the sample offset at which it happened.
+	Calculations are performed lazily for performance reasons.
+	This works on a 1-channel signal only.
+	"""
 
 	def calcdb(samples,chunksize):
-		for chunk in chunk_stream(samples,chunksize):
+		for chunk in chunked(samples,chunksize):
 			yield calculate_rms_dB(chunk)
 
 	def diffs(lst):
@@ -50,105 +89,129 @@ def find_first_nonsilence(samples,sampling_rate):
 			else: yield None
 			olddatum = datum
 
-	chunksize = sampling_rate/500 # 10 ms
+	chunksize = sampling_rate/500
 	threshold = 2
 
 	for chunknum,dB_diff in enumerate(diffs(calcdb(samples,chunksize))):
 		if dB_diff > threshold: return chunknum * chunksize
 
-def get_amplitudes(chunk,npoints):
-	"""Generates amplitudes, discarding the zero freq and the
-	above-Nyquist freqs. Auto-pads chunks shorter than npoints,
-	auto-averages chunks longer than npoints.
-	Returns a list of amplitudes, half the length of npoints.
+
+def analyze_spectrum(signal,numbands):
+	"""Computes amplitudes, discarding the zero freq and the
+	above-Nyquist freqs. Auto-pads signals nonmultple of numbands * 2,
+	auto-averages results from streams longer than numbands * 2.
+
+	Returns a list of amplitudes, one for each band.  Values represent
+	the raw sample value / strength of the signal in each band.
 	"""
-	if len(chunk) > npoints:
-		amplitudes = numpy.array( [
-			get_amplitudes(chunk,npoints) for chunk in
-			[ c for c in chunk_stream(chunk,npoints) ]
-		] )
-		return average(amplitudes)
-	if len(chunk) < npoints:
-		 # pad array with zeros in case it mismatches
-		chunk = list(chunk) + [0.] * ( npoints  - len(chunk) )
-		chunk = scipy.array(chunk)
-	hammed = chunk * scipy.signal.hamming(len(chunk))
-	# compute magnitudes for each frequency band
-	norm_amplitudes = pow(abs(scipy.fft(hammed)),2) / npoints
-	return norm_amplitudes[ 1 : 1 + len(norm_amplitudes) / 2 ]
+
+	npoints = numbands * 2
+
+	def dofft(chunk):
+		if len(chunk) < npoints:
+			# pad chunk with zeros in case it is too short
+			chunk = list(chunk) + [0.] * ( npoints  - len(chunk) )
+			chunk = scipy.array(chunk)
+		# ham the chunk
+		hammed = chunk * scipy.signal.hamming(len(chunk))
+		# compute amplitude for each band
+		fftresult = pow(abs(scipy.fft(hammed)),2) / npoints
+		# return, discarding above-nyquist frequency amplitudes
+		return fftresult[ 1 : 1 + numbands ]
+
+	specs = numpy.array([ dofft(chunk) for chunk in chunked(signal,npoints) ])
+	spectrum = specs.sum(0) / specs.shape[0] # average along the 0th axis
+	return spectrum
 
 
-def get_amplitudes_dB(data,npoints):
-	return [ calculate_rms_dB(m,max=1.0) for m in get_amplitudes(data,npoints) ]
+def analyze_spectrum_dB(data,numbands,zero_dB_equiv=1.0):
+	"""Same as analyze_spectrum() but transforms each strength into dB.
+	Equivalent to [ calculate_dB(m) for m in analyze_spectrum(...) ]
+	"""
+	return [ calculate_dB(m,zero_dB_equiv) for m in analyze_spectrum(data,numbands) ]
 
 
+def dB_to_char(dB_value):
+	def diddlydum(lst):
+		for n,y in enumerate(lst):
+			if n==0: continue
+			yield (lst[n-1],y)
 
-fft_window_size = 256 # 128 below-nyquist bands, 64 after trimming the high end
+	codes = "-zyxwvutsrqponmlkjihgfedcba012+"
+	brackets = [-scipy.inf] + list(numpy.linspace(-81.+1.5,6.+1.5,len(codes)-1)) + [scipy.inf]
+	for n,(lbound,ubound) in enumerate(diddlydum(brackets)):
+		if lbound < dB_value <= ubound: return codes[n]
+	assert False
+
+def dB_to_string(dB_value_list):
+	return "".join([ dB_to_char(val) for val in dB_value_list ])
 
 
-lowpass_freq = 200
-lowpass_order = 3
-#b,a = scipy.signal.butter(lowpass_order,float(lowpass_freq)/(sampling_rate/2))
-#firstminute = scipy.signal.lfilter(b,a,firstminute)
+# === signatures ===
 
+def wav_butterscotch(filename,use_dB=False,full_spectrum=False):
 
-def get_first_frequency_analysis(filename):
 	f = wave.open(filename,"r")
+	if f.getcomptype() != "NONE":
+		raise NotImplementedError, "compression type %r not supported"%f.getcomptype()
+	if f.getsampwidth() != 2:
+		raise NotImplementedError, "sample width %d bits not supported"%f.getsampwidth()*8
+	if f.getframerate() != 44100:
+		raise NotImplementedError, "sampling rate %d not supported"%f.getframerate()
+	if f.getnframes() == 0:
+		raise wave.Error, "zero-length files not supported"
 	sampling_rate = f.getframerate()
+	sample_width = f.getsampwidth()
 	channels = f.getnchannels()
-	print "Frames: ",f.getnframes()
+	numframes = f.getnframes()
 
-	firstminute = f.readframes(10*sampling_rate)
-	firstminute = scipy.array(array.array("h",firstminute))
-	firstminute = mixdown(firstminute,channels)
-	first_audible_frame = find_first_nonsilence(firstminute,sampling_rate)
-	if first_audible_frame is None:
-		print "Failed to find frame with audible data, seeking to zero"
-		f.setpos(0)
-	else:
-		print "Found first frame with audible data: %d, seeking to it"%first_audible_frame
-		f.setpos(first_audible_frame)
+	buf = ""
+	while f.tell() < numframes:
+		buf += f.readframes(sampling_rate)
+		samples = mix_down(numpy.array(array.array("h",buf)),channels)
+		pos = find_signal_onset(samples,sampling_rate)
+		if pos is not None: break
 
-	pointlist = []
-	for x in xrange(4):
-		offset = f.tell()
-		audio_data = f.readframes(sampling_rate*10)
-		stream = scipy.array(array.array("h",audio_data)) / 32768.
-		stream = mixdown(stream,channels)
-		points = get_amplitudes(stream,fft_window_size)
-		# here I have up to the nyquist frequencies
-		# I'll make sure to trim the upper half
-		# since MP3s lose them
-		# FIXME make me work with 22050 hz and other sampling freqs
-		# for this we would need to scale the FFT points depending on the
-		# source sampling frequency
-		points = points[:len(points) / 2]
-		pointlist.append(points)
-		#points = [ (band,v) for band,v in enumerate(points[:len(points) / 2]) ]
-		#pointlist.extend( [ (offset,band,v) for band,v in points ] )
-	return pointlist
+	if pos is None: pos = 0
+	f.setpos(pos) # go to onset of signal
 
+	bands =128 # below-nyquist bands, and we will trim the high end later
+	# FIXME accept other sampling freqs, we need to scale the number of bands
+	# or compute it proportionally to the sampling rate, so that the bandwidth
+	# of each band stays constant and we can detect duplicates with
+	# different sampling rate
+	spectrums = []
+	expected_bytes = sampling_rate*10*sample_width*channels
+	for x in xrange(6):
+		# read ten seconds
+		buf = f.readframes(sampling_rate*10)
+		# break on less than ten seconds of data
+		if len(buf) < expected_bytes: break
+		# mix those ten seconds down
+		stream = mix_down(scipy.array(array.array("h",buf)),channels)
+		# make the stream signed floating point, value 1.0 is 0 dB
+		stream /= 32768.
+		# get the spectrum
+		if use_dB: spectrum = analyze_spectrum_dB(stream,bands)
+		else: spectrum = analyze_spectrum(stream,bands)
+		# trim the high end
+		if not full_spectrum: spectrum = spectrum[:len(spectrum) / 2]
+		# accumulate the spectrum
+		spectrum = numpy.array(spectrum)
+		spectrums.append(spectrum)
 
-ps1 = get_first_frequency_analysis(sys.argv[1])
-ps2 = get_first_frequency_analysis(sys.argv[2])
+	spectrums = numpy.array(spectrums)
+	return (pos,spectrums)
 
-for n,row in enumerate(ps1):
-	p1 = ps1[n]
-	p2 = ps2[n]
-	print n, numpy.corrcoef(p1,p2)[1][0]
+def butterscotch_correlate_by_spectrum(signature1,signature2):
+	correls = []
+	for n in range( min( [ len(signature1), len(signature2) ] ) ):
+		correls.append(numpy.corrcoef(signature1[n],signature2[n])[1][0])
+	return correls
 
-#audiodevice = alsaaudio.PCM()
-#audiodevice.setchannels(2)
-#audiodevice.setformat(alsaaudio.PCM_FORMAT_S16_LE)
-#audiodevice.setperiodsize(sampling_rate)
-
-#cla()
-pickle.dump([ps1,ps2],file("/tmp/data1","w"))
-
-	##freq = numpy.fft.fftfreq(5)
-	##print freq
-
-
-
-#write an algorithm that combines the phase beat detector and a time-domain beat detector for best results, and write a program that uses it and writes the TBPM tag on mp3
-#now that we know the fft code is solid, we can apply the bark scale to get the appropriate buckets from the FFT, so we can compare songs, thkn about the databse structure that will contain these 1 second 60 buckets of spectrum amplitude
+def butterscotch_correlate_by_band(signature1,signature2):
+	correls = []
+	signature1,signature2 = [ s.transpose() for s in (signature1,signature2) ]
+	for n in range( min( [ len(signature1), len(signature2) ] ) ):
+		correls.append(numpy.corrcoef(signature1[n],signature2[n])[1][0])
+	return correls
