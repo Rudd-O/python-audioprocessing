@@ -1,4 +1,4 @@
-= Python audio processing suite
+= Python audio processing suite =
 
 This Python module contains a variety of convenience functions to
 process audio signals.
@@ -20,15 +20,25 @@ All major distributions include these packages, either as default or
 in their package manager repositories.  You can get these things in
 a matter of minutes, so there's no excuse not to use this software.
 
-== How to install it ==
+== How to get and install it ==
 
-  python setup.py install
+There are three ways you can get Radio jockey:
 
-or
+=== Official, ready-to-install release for your distribution ===
 
-  python setup.py bdist_rpm
+Find it [/radio-jockey/downloads on the releases page].  Install it
+using your distribution's package manager.
 
-if you want packages for your operating system.
+=== Official, buildable source package ===
+
+Get the compressed tape archive on [/radio-jockey/downloads on the releases
+page].  Install it using [http://docs.python.org/inst/inst.html Python's distutils].
+
+=== Latest code, directly from our Git repository ===
+
+Clone [/radio-jockey/git/ our Git repository] to get the latest snapshot
+of the source code.  You can [/radio-jockey/browser inspect the repository]
+online too.
 
 == Help! ==
 
