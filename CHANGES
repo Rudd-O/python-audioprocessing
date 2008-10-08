@@ -1,0 +1,5 @@
+Version 0.0.2:
+
+* Changed default signature to 32 bands [0..11025] and 12 10-second samples
+* Changed correlation functions to return correlation average
+* Verified with threshold 0.9 - correlation works reliably as duplicate identifier

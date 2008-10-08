@@ -2,9 +2,16 @@
 
 from distutils.core import setup
 
+for line in open('audioprocessing/__init__.py'):
+	if line.startswith('__version__'):
+	version = line.split()[-1].strip("'").strip('"')
+	break
+else:
+	raise ValueError, '"__version__" not found in "audioprocessing/__init__.py"'
+
 setup(
 	name = 'python-audioprocessing',
-	version = '0.0.1',
+	version = version,
 	description = 'A set of convenience tools to process audio',
 	long_description = """The Python audio processing suite is a set of tools to process audio.""",
 	author = 'Manuel Amador (Rudd-O)',

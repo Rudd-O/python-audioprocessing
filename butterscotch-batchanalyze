@@ -3,29 +3,39 @@
 import subprocess
 import audioprocessing
 import gdbm
-import pickle
+import cPickle as pickle
 import wave
+import processing
+import time
 
 dictionaryname = "data.gdbm"
-playlist = file("playlist.m3u")
+playlist = "playlist.m3u"
 wavpath = "tmp.wav"
 
-files = [ s.strip() for s in playlist.readlines() if s.strip() ]
-dictionary = gdbm.open(dictionaryname,"c")
-
-for themp3 in files:
-	if not themp3.endswith(".mp3") or themp3.startswith("#"): continue
-	print "Processing",themp3
-	try: subprocess.check_call(["mpg321","-w",wavpath,themp3])
-	except Exception,e:
-		print themp3,"decoding failed: ",str(e),"- continuing to next file"
-		continue
+def do_one(filename):
 	try:
-		data = audioprocessing.wav_butterscotch(wavpath)
-		dictionary[themp3] = pickle.dumps(data)
-	except (IOError,OSError,wave.Error,NotImplementedError),e:
-		print themp3,"signature failed: ",str(e),"- continuing to next file"
-		continue
-	
+		res = audioprocessing.mp3_butterscotch(filename)
+		return (filename,res)
+	except Exception,e:
+		print filename,"signature failed: ",str(e)
+		return (filename,None)
+
+dictionary = gdbm.open(dictionaryname,"c")
+pool = processing.Pool(4)
+files = [ s.strip() for s in file(playlist).readlines() if s.strip() ]
+files = [ f for f in files if f.endswith(".mp3") and not f.startswith("#") ]
+
+times = [time.time()]
+def avg(lst): return sum(lst) / len(lst)
+for filename, result in pool.imap_unordered(do_one,files):
+	times.append(time.time())
+	if not result: continue
+	since_last = times[-1] - times[-2]
+	average = avg(tuple(audioprocessing.deltas(times)))
+	num_processed = len(times) - 1
+	num_left = len(files) - num_processed
+	eta = average * num_left
+	print filename,"done.\n%.02f since last song, %02f average, ETA %.01f"%(since_last,average,eta)
+	dictionary[filename] = pickle.dumps(result)
 
 dictionary.close()

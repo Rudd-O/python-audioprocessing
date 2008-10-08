@@ -7,7 +7,7 @@ Distributed under the GPL v3.  Copyright Manuel Amador (Rudd-O).
 """
 
 import audioprocessing as a
-import pickle
+import cPickle as pickle
 from optparse import OptionParser
 import wave
 import sys
@@ -36,15 +36,27 @@ if len(args) != 2:
 signatures = []
 for arg in args:
 	try:
-		signal_onset,signature =a.wav_butterscotch(arg,full_spectrum=options.full_spectrum,use_dB=options.use_dB)
+		func = a.wav_butterscotch
+		if arg.lower().endswith("mp3"): func = a.mp3_butterscotch
+		signal_onset,signature =func(arg,full_spectrum=options.full_spectrum,use_dB=options.use_dB)
 		signatures.append(signature)
-	except (IOError,OSError,wave.Error,NotImplementedError),e:
+	except (IOError,OSError,wave.Error,NotImplementedError,
+			a.NoAudioOnset,a.NotEnoughAudio),e:
 		sys.stderr.write("%s: %s\n"%(arg,str(e)))
 		sys.stderr.flush()
 		sys.exit(1)
 
-if options.by_band: correls = a.butterscotch_correlate_by_band(*signatures)
-else: correls = a.butterscotch_correlate_by_spectrum(*signatures)
+if signatures[0].shape != signatures[1].shape:
+	if options.by_band:
+		sys.stderr.write("One or more of the files is too short to correlate by band\n")
+	else:
+		assert False, "Impossible: apparently the Butterscotch signature for one file has a different number of bands than the other's signature!"
+	sys.stderr.flush()
+	sys.exit(1)
+
+if options.by_band: func = a.butterscotch_correlate_by_band
+else: func = a.butterscotch_correlate_by_spectrum
+correls = func(*signatures)
 avgcorrel = sum(correls) / len(correls)
 maxcorrel = max(correls)
 mincorrel = min(correls)

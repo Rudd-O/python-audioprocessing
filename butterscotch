@@ -15,9 +15,9 @@ import os
 
 usage = """usage: %prog [options] file.wav [file2.wav...]
 
-This program calculates the Butterscotch signature of the supplied sound files.  A Butterscotch signature consists of at most six spectrum analyses, each performed on consecutive ten-second blocks of audio, starting from the onset of the first 2 dB RMS increase counted each ~11 milliseconds.
+This program calculates the Butterscotch signature of the supplied sound files.  A Butterscotch signature consists of six spectrum analyses, each performed on consecutive ten-second blocks of audio, starting from the onset of the first 2 dB RMS increase counted each ~11 milliseconds.
 
-Each spectrum analysis samples 64 equal-width frequency bands from the first significant band to 11.025 KHz (approximately).  Each sample represents the relative signal amplitude, with the reference 0 dB amplitude being equivalent 1.0.  Samples are not normalized to dB, but instead printed raw.
+Each spectrum analysis samples 64 equal-width frequency bands from the first significant band to 11.025 KHz (approximately).  Each sample represents the relative signal amplitude, with the reference 0 dB amplitude being equivalent to the value 1.0.  Samples are not normalized to dB, but instead printed raw.
 
 Recoverable errors processing one or more files cause an exit code of 2, but processing continues to the next file.  Fatal errors cause an exit code of 1."""
 
@@ -38,8 +38,10 @@ dict = {}
 onefilefailed = False
 for arg in args:
 	try:
+		func = a.wav_butterscotch
+		if arg.lower().endswith("mp3"): func = a.mp3_butterscotch
 		outputdb = options.use_dB or options.fingerprint
-		signal_onset,signature =a.wav_butterscotch(arg,use_dB=outputdb,full_spectrum=options.full_spectrum)
+		signal_onset,signature =func(arg,use_dB=outputdb,full_spectrum=options.full_spectrum)
 		if options.fingerprint:
 			signature = [ a.dB_to_string(row) for row in signature ]
 		if options.pickled: dict[arg] = {
@@ -50,7 +52,8 @@ for arg in args:
 			print "%s"%arg
 			print "Signal onset at sample %d"%signal_onset
 			for row in signature: print str(row)
-	except (IOError,OSError,wave.Error,NotImplementedError),e:
+	except (IOError,OSError,wave.Error,NotImplementedError,
+			a.NoAudioOnset,a.NotEnoughAudio),e:
 		onefilefailed = True
 		sys.stderr.write("%s: %s\n"%(arg,str(e)))
 		sys.stderr.flush()
