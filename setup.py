@@ -4,8 +4,8 @@ from distutils.core import setup
 
 for line in open('audioprocessing/__init__.py'):
 	if line.startswith('__version__'):
-	version = line.split()[-1].strip("'").strip('"')
-	break
+		version = line.split()[-1].strip("'").strip('"')
+		break
 else:
 	raise ValueError, '"__version__" not found in "audioprocessing/__init__.py"'
 
