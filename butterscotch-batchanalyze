@@ -33,7 +33,7 @@ def do_one(filename):
 		res = audioprocessing.mp3_butterscotch(filename,
 			options.blocks,options.spb,options.bands)
 		if not options.full_spectrum: signature = res.halve_highest_freq()
-		if options.use_dB or options.fingerprint: signature = signature.as_dB()
+		if options.use_dB: signature = signature.as_dB()
 		if options.use_log_bands: signature = signature.as_log_bands()
 		print "%s: %s"%(filename,signature)
 		return (filename,res)
@@ -44,8 +44,10 @@ def do_one(filename):
 dictionary = gdbm.open(dictionaryname,"c")
 pool = processing.Pool(4) #FIXME numcpus
 
+already = dictionary.keys()
+
 files = [ s.strip() for s in file(playlist).readlines() if s.strip() ]
-files = [ f for f in files if f.endswith(".mp3") and not f.startswith("#") ]
+files = [ f for f in files if f.endswith(".mp3") and not f.startswith("#") and not in already ]
 
 times = [time.time()]
 def avg(lst): return sum(lst) / len(lst)
@@ -58,6 +60,6 @@ for filename, result in pool.imap_unordered(do_one,files):
 	num_left = len(files) - num_processed
 	eta = average * num_left
 	print "%.02f since last song, %02f average, ETA %.01f"%(since_last,average,eta)
-	dictionary[filename] = pickle.dumps(result)
+	if result: dictionary[filename] = pickle.dumps(result)
 
 dictionary.close()
