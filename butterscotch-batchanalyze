@@ -29,16 +29,15 @@ dictionaryname,playlist = args
 
 def do_one(filename):
 	try:
-		print "Computing signature of %s..."%filename
 		res = audioprocessing.mp3_butterscotch(filename,
 			options.blocks,options.spb,options.bands)
 		if not options.full_spectrum: signature = res.halve_highest_freq()
 		if options.use_dB: signature = signature.as_dB()
 		if options.use_log_bands: signature = signature.as_log_bands()
-		print "%s: %s"%(filename,signature)
+		print "%s:\n%s"%(filename,signature)
 		return (filename,res)
 	except Exception,e:
-		print "%s: signature failed: %s"%(filename,str(e))
+		print "%s:\nSignature failed: %s"%(filename,str(e))
 		return (filename,None)
 
 dictionary = gdbm.open(dictionaryname,"c")
