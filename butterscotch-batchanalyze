@@ -7,21 +7,43 @@ import cPickle as pickle
 import wave
 import processing
 import time
+import sys
+import os
 
-dictionaryname = "data.gdbm"
-playlist = "playlist.m3u"
-wavpath = "tmp.wav"
+
+description = """This program calculates the Butterscotch signature of all files in the supplied playlist, then stores them into a GDBM database, as pickled strings.
+
+Refer to the butterscotch command for the default parameters of Butterscotch signatures."""
+
+shortcmdline = "[options] cache.gdbm playlist.m3u"
+
+parser = audioprocessing.parser(shortcmdline,description)
+
+options,args = parser.parse_args()
+
+if len(args) != 2:
+	parser.print_help()
+	sys.exit(os.EX_USAGE)
+
+dictionaryname,playlist = args
 
 def do_one(filename):
 	try:
-		res = audioprocessing.mp3_butterscotch(filename)
+		print "Computing signature of %s..."%filename
+		res = audioprocessing.mp3_butterscotch(filename,
+			options.blocks,options.spb,options.bands)
+		if not options.full_spectrum: signature = res.halve_highest_freq()
+		if options.use_dB or options.fingerprint: signature = signature.as_dB()
+		if options.use_log_bands: signature = signature.as_log_bands()
+		print "%s: %s"%(filename,signature)
 		return (filename,res)
 	except Exception,e:
-		print filename,"signature failed: ",str(e)
+		print "%s: signature failed: %s"%(filename,str(e))
 		return (filename,None)
 
 dictionary = gdbm.open(dictionaryname,"c")
-pool = processing.Pool(4)
+pool = processing.Pool(4) #FIXME numcpus
+
 files = [ s.strip() for s in file(playlist).readlines() if s.strip() ]
 files = [ f for f in files if f.endswith(".mp3") and not f.startswith("#") ]
 
@@ -35,7 +57,7 @@ for filename, result in pool.imap_unordered(do_one,files):
 	num_processed = len(times) - 1
 	num_left = len(files) - num_processed
 	eta = average * num_left
-	print filename,"done.\n%.02f since last song, %02f average, ETA %.01f"%(since_last,average,eta)
+	print "%.02f since last song, %02f average, ETA %.01f"%(since_last,average,eta)
 	dictionary[filename] = pickle.dumps(result)
 
 dictionary.close()

@@ -8,31 +8,44 @@ Distributed under the GPL v3.  Copyright Manuel Amador (Rudd-O).
 
 import audioprocessing as a
 import pickle
-from optparse import OptionParser
 import wave
 import sys
 import os
+import threading
+import time
+import signal
 
-usage = """usage: %prog [options] file.wav [file2.wav...]
+description = """This program calculates the Butterscotch signature of the supplied sound files.  A Butterscotch signature is a two-dimensional array where the rows represent frequency bands in time, the columns represent all the frequency bands at a particular time, and the values represent the relative signal amplitude, with the reference 0dB amplitude equal to 1.0.
 
-This program calculates the Butterscotch signature of the supplied sound files.  A Butterscotch signature consists of six spectrum analyses, each performed on consecutive ten-second blocks of audio, starting from the onset of the first 2 dB RMS increase counted each ~11 milliseconds.
-
-Each spectrum analysis samples 64 equal-width frequency bands from the first significant band to 11.025 KHz (approximately).  Each sample represents the relative signal amplitude, with the reference 0 dB amplitude being equivalent to the value 1.0.  Samples are not normalized to dB, but instead printed raw.
+By default, the computation of the signature is performed on at most 12 consecutive blocks (each ten seconds long) of audio, starting from the onset of the first 2 dB RMS increase counted each ~11 milliseconds.  64 equal-width frequency bands are computed (up to the Nyquist frequency), and the high half is discarded.  Thus, 32 bands are represented in the signature, from the lowest non-DC frequency band up to half the Nyquist frequency (11.025 Hz for files sampled at 44.100 Hz).
 
 Recoverable errors processing one or more files cause an exit code of 2, but processing continues to the next file.  Fatal errors cause an exit code of 1."""
 
-epilog = """This program only knows how to process 16-bit little-endian linear-encoded 44.100 KHz mono / stereo / multichannel RIFF WAVE files.  It also doesn't know how to read from standard input or named pipes, since it needs to perform a seek in the audio file."""
-parser = OptionParser(usage=usage,epilog=epilog)
-parser.add_option("-d","--decibel",help="Compute decibel (dB) levels instead of raw signal values.  Useful for plotting spectrums.", action="store_true",dest="use_dB")
-parser.add_option("-g","--fingerprint",help="Turn each sample into a character representation of itself, using decibel (dB) values. '0' means between 0 and -3 dB; each letter from a to z represents a -3 dB quanta.  Implies --decibel.", action="store_true",dest="fingerprint")
-parser.add_option("-s","--full-spectrum",help="Compute the full spectrum below the Nyquist frequency instead of just up to 11025 Hz.  Useful to plot the full spectrum, and to compare high frequency loss in lossly encoded files.  You can combine it with --fingerprint to get a quick ASCII representation of frequency bands.", action="store_true",dest="full_spectrum")
-parser.add_option("-p","--pickle",help="Output a pickled representation of a dictionary with the file names as keys and {signal_onset,signature} as values.  If you're interfacing programmatically with this program from another Python program , you should read this output and load it with the pickle module.", action="store_true",dest="pickled")
-options,args = parser.parse_args()
+shortcmdline = "[ -t | -p | -f | -g ] [moreoptions] file1.wav [file2.mp3...]"
 
+parser = a.parser(shortcmdline,description)
+
+parser.add_option("-t","--text",help="Output a textual representation.  This is the default.", action="store_true",dest="text")
+parser.add_option("-p","--pickle",help="Output a pickled representation of a dictionary with the file names as keys and the signatures (type audioprocessing.ButterscotchSignature) as values.  If you're interfacing programmatically with this program from another Python program , you should read this output and load it with the pickle module.", action="store_true",dest="pickle")
+parser.add_option("-f","--fingerprint",help="Turn each sample into a character representation of itself, using decibel (dB) values. '0' means between 0 and -3 dB; each letter from a to z represents a -3 dB quanta.  Automatically turns --decibel on.", action="store_true",dest="fingerprint")
+parser.add_option("-g","--graph",help="Use the Matplotlib and PyLab libraries to plot the results of the signature in 3D.  Combine this with --decibel and --full-spectrum, and you get a fancy interactive 3D spectrum analyzer.", action="store_true",dest="graph")
+
+options,args = parser.parse_args()
 
 if not args:
 	parser.print_help()
 	sys.exit(os.EX_USAGE)
+
+output_opts = [options.graph,options.fingerprint,options.pickle,options.text]
+
+if len( [ x for x in output_opts if x ] ) > 1:
+	sys.stderr.write("conflicting options: choose one of -tpfg\n\n")
+	sys.stderr.flush()
+	parser.print_help()
+	sys.exit(os.EX_USAGE)
+
+if len( [ x for x in output_opts if x ] ) == 0:
+	options.text = True
 
 dict = {}
 onefilefailed = False
@@ -40,22 +53,35 @@ for arg in args:
 	try:
 		func = a.wav_butterscotch
 		if arg.lower().endswith("mp3"): func = a.mp3_butterscotch
-		outputdb = options.use_dB or options.fingerprint
-		signal_onset,signature =func(arg,use_dB=outputdb,full_spectrum=options.full_spectrum)
+		signature = func(arg,options.blocks,options.spb,options.bands)
+
+		if not options.full_spectrum: signature = signature.halve_highest_freq()
+		if options.use_dB or options.fingerprint: signature = signature.as_dB()
+		if options.use_log_bands: signature = signature.as_log_bands()
+
+		if options.pickle: dict[arg] = signature
+		if options.text:
+			print "%s:"%arg
+			print signature
+			for row in signature.bands: print str(row)
+			print ""
 		if options.fingerprint:
-			signature = [ a.dB_to_string(row) for row in signature ]
-		if options.pickled: dict[arg] = {
-				"signal_onset":signal_onset,
-				"signature":signature
-			}
-		else:
-			print "%s"%arg
-			print "Signal onset at sample %d"%signal_onset
-			for row in signature: print str(row)
+			print "%s:"%arg
+			print signature
+			for row in signature.bands: print a.dB_to_string(row)
+			print ""
+		if options.graph:
+			signature.display(async=True,title=arg)
 	except (IOError,OSError,wave.Error,NotImplementedError,
-			a.NoAudioOnset,a.NotEnoughAudio),e:
+			a.NoAudioOnset,a.NotEnoughAudio,ImportError),e:
 		onefilefailed = True
 		sys.stderr.write("%s: %s\n"%(arg,str(e)))
 		sys.stderr.flush()
-if options.pickled: print pickle.dumps(dict),
+
+if options.pickle: print pickle.dumps(dict),
+if options.graph:
+	try:
+		import pylab
+		pylab.show()
+	except ImportError: pass
 if onefilefailed: sys.exit(2)

@@ -63,13 +63,13 @@ def capture_call(*args,**kwargs):
 # === iterables processing primitives ===
 
 
-def chunked(stream,samples):
+def chunked(stream,count):
 	"""Given a sequence, returns it in chunks of len(samples) or less"""
 	offset = 0
 	length = len(stream)
 	while offset < length:
-		yield stream[offset:offset+samples]
-		offset = offset + samples
+		yield stream[offset:offset+count]
+		offset = offset + count
 
 
 def in_pairs(lst):
@@ -82,6 +82,21 @@ def in_pairs(lst):
 def deltas(lst):
 	"""Given an iterable, it returns the difference of each element and its preceding one."""
 	for before,after in in_pairs(lst): yield after - before
+
+
+def log2_average(arr):
+	if math.log(len(arr),2) != int(math.log(len(arr),2)):
+		raise ValueError, "array length must be a power of 2"
+
+	avgs = []
+	while len(arr) > 1:
+		lows = arr[:len(arr)/2]
+		highs = arr[len(arr)/2:]
+		avgs.append(highs.mean())
+		arr = lows
+	avgs.append(arr[0])
+	avgs.reverse()
+	return numpy.array(avgs)
 
 
 # === audio processing pipelines
@@ -126,8 +141,8 @@ def calculate_rms_dB(chunk,zero_dB_equiv=1.0):
 calculate_dB = calculate_rms_dB
 
 
-def find_signal_onset(samples,sampling_rate):
-	"""Chunks the samples in 11.337 ms chunks (give or take a few samples)
+def find_signal_onset(stream,sampling_rate):
+	"""Chunks the stream in 11.337 ms chunks (give or take a few samples)
 	calculates RMS power levels of each chunk, and compares each power
 	level to the previous one.
 	The first comparison that yields a greater-than-2-dB increase stops
@@ -136,8 +151,8 @@ def find_signal_onset(samples,sampling_rate):
 	This works on a 1-channel signal only.
 	"""
 
-	def calcdb(samples,chunksize):
-		for chunk in chunked(samples,chunksize):
+	def calcdb(stream,chunksize):
+		for chunk in chunked(stream,chunksize):
 			yield calculate_rms_dB(chunk)
 
 	def diffs(lst):
@@ -150,42 +165,52 @@ def find_signal_onset(samples,sampling_rate):
 	chunksize = sampling_rate/500
 	threshold = 2
 
-	for chunknum,dB_diff in enumerate(diffs(calcdb(samples,chunksize))):
+	for chunknum,dB_diff in enumerate(diffs(calcdb(stream,chunksize))):
 		if dB_diff > threshold: return chunknum * chunksize
 
 
-def analyze_spectrum(signal,numbands):
-	"""Computes amplitudes, discarding the zero freq and the
-	above-Nyquist freqs. Auto-pads signals nonmultple of numbands * 2,
-	auto-averages results from streams longer than numbands * 2.
+def analyze_spectrum(signal,npoints):
+	"""Computes FFT for the signal, discards the zero freq and the
+	above-Nyquist freqs. Auto-pads signals nonmultple of npoints,
+	auto-averages results from streams longer than npoints.
+	Thus, npoints results in npoints/2 bands.
 
-	Returns a list of amplitudes, one for each band.  Values represent
-	the raw sample value / strength of the signal in each band.
+	Returns a numpy array, each element represents the raw amplitude
+	of a frequency band.
 	"""
 
-	npoints = numbands * 2
+	signal = signal.copy()
+	if divmod(len(signal),npoints)[1] != 0:
+		round_up = len(signal) / npoints * npoints + npoints
+		signal.resize( round_up )
+	signal = signal.reshape((-1,npoints))
+
 	hamming = scipy.signal.hamming(npoints)
+	hamming = scipy.hstack( [ hamming for x in xrange(len(signal)) ] )
+	hamming = hamming.reshape((-1,npoints))
 
-	def dofft(chunk):
-		if len(chunk) < npoints:
-			# pad chunk with zeros in case it is too short
-			chunk = list(chunk) + [0.] * ( npoints  - len(chunk) )
-			chunk = scipy.array(chunk)
-		# compute amplitude for each band, using hamming window
-		fftresult = scipy.fft(chunk * hamming)
-		# return, discarding above-nyquist frequency amplitudes
-		return pow(abs(fftresult[ 1 : 1 + numbands ]),2) / npoints
+	hammed = signal * hamming
 
-	specs = numpy.vstack([ dofft(chunk) for chunk in chunked(signal,npoints) ])
-	spectrum = specs.mean(0) # average along the 0th axis
-	return spectrum
+	fft = numpy.fft.rfft(hammed)[:,1:]
+	result = pow(abs(fft),2) / npoints
+	result = result.mean(0)
+
+	return result
 
 
-def analyze_spectrum_dB(data,numbands,zero_dB_equiv=1.0):
-	"""Same as analyze_spectrum() but transforms each strength into dB.
-	Equivalent to [ calculate_dB(m) for m in analyze_spectrum(...) ]
-	"""
-	return [ calculate_dB(m,zero_dB_equiv) for m in analyze_spectrum(data,numbands) ]
+def analyze_spectrum_by_blocks(signal,npoints,samples_per_block):
+	"""Computes analyze_spectrum(...) for each block of
+	block_len samples in signal."""
+
+	return numpy.vstack(
+		map(
+			lambda chunk: analyze_spectrum(chunk,npoints),
+			chunked(
+				signal,
+				samples_per_block,
+			)
+		)
+	)
 
 
 def dB_to_char(dB_value):
@@ -222,9 +247,9 @@ def find_audio_onset(f):
 		f.setpos(oldpos)
 
 
-def read_wave(f,secs):
-	"""Given a wave object, read ( object's sampling rate * secs ) frames,
-	then return a numpy array with `secs` seconds of sample data;
+def read_wave(f,frames):
+	"""Given a wave object, read the number of frames,
+	then return a numpy array with those frames.
 	this data has been mixed down and each sample has been converted
 	to floating point where 0 dB = 1.0. If there wasn't enough data, all the
 	data that could be read is returned.
@@ -234,15 +259,13 @@ def read_wave(f,secs):
 		raise NotImplementedError, "compression type %r not supported"%f.getcomptype()
 	if f.getsampwidth() != 2:
 		raise NotImplementedError, "sample width %d bits not supported"%f.getsampwidth()*8
-	if f.getframerate() != 44100:
-		raise NotImplementedError, "sampling rate %d not supported"%f.getframerate()
 	if f.getnframes() == 0:
 		raise wave.Error, "zero-length files not supported"
 	sampling_rate = f.getframerate()
 	sample_width = f.getsampwidth()
 	channels = f.getnchannels()
 
-	frames = f.readframes(sampling_rate*secs)
+	frames = f.readframes(frames)
 	buf = numpy.core.fromstring(frames,dtype=numpy.dtype("int16"))
 	stream = mix_down(buf,channels)
 	stream /= 32768.
@@ -277,97 +300,172 @@ def decode_mp3(mp3file,numframes=None,firstframe=None):
 
 # === signatures ===
 
+class ButterscotchSignature:
+	"""A Butterscotch signature:
 
-class NotEnoughAudio(Exception): pass # raised by Butterscotch signature generator
-def butterscotch(stream,sampling_rate,secs_per_block,use_dB=False,full_spectrum=False):
-	# This function expects the first sample of stream to be the onset
-	# of signal, and expects the signal to be 60 seconds long
+	self.bands: self.bands[N] = list of intensities for band N, one per block
+	self.blocks: self.blocks[N]: list of intensities for frequency N, one per band"""
 
-	if sampling_rate != 44100: # FIXME
-		raise NotImplementedError, "Butterscotching for sample rate %d not implemented"%sampling_rate
+	def __init__(self,data,secs_per_block,audio_onset_sample,highest_freq):
+		self.bands = data
+		self.blocks = data.transpose()
+		self.audio_onset_sample = audio_onset_sample
+		self.secs_per_block = secs_per_block
+		self.highest_freq = highest_freq
+		self.linear_bands = True
+		self.linear_intensities = True
 
-	if len(stream) < sampling_rate*secs_per_block:
-		raise NotEnoughAudio,"%d samples received, at least %d samples needed"%(len(stream),sampling_rate*secs_per_block)
+	def freq_centerpoints(self):
+		if self.linear_bands:
+			return numpy.linspace(0,self.highest_freq,len(self.bands)+1)[1:]
+		else:
+			return log2_average(numpy.linspace(0,self.highest_freq,2**(len(self.bands)-1)+1)[1:])
 
-	# FIXME accept other sampling freqs, we need to scale
-	# the number of bands
-	# or compute it proportionally to the sampling rate,
-	# so that the bandwidth
-	# of each band stays constant and we can detect duplicates with
-	# different sampling rate
-	bands = 64 # below-nyquist bands - we cut the high half later
-	spectrums = []
-	for block in chunked(stream,sampling_rate*secs_per_block):
-		# if chunk is incomplete, we cannot compute the FFT
-		if len(block) < sampling_rate*secs_per_block: break
-		# do frequency analysis
-		if use_dB: spectrum = analyze_spectrum_dB(block,bands)
-		else: spectrum = analyze_spectrum(block,bands)
-		# trim the high end
-		if not full_spectrum: spectrum = spectrum[:len(spectrum) / 2]
-		# accumulate the spectrum
-		spectrums.append(spectrum)
+	def __str__(self):
+		f = self.freq_centerpoints()
+		startfreq = f[0]
+		endfreq = f[-1]
+		if self.linear_intensities: u = "raw: 0 dB = value 1.0"
+		else: u = "measured in dB"
+		if self.linear_bands: l = "linear"
+		else: l = "logarithmically averaged"
+		return "Butterscotch signature containing %d %d-second blocks of %d %s bands (%s), from %d to %d Hz, starting at sample %d in the original audio data."%(len(self.blocks), self.secs_per_block, len(self.bands), l, u, startfreq, endfreq, self.audio_onset_sample)
 
-	try: return numpy.vstack(spectrums)
-	except ValueError: return None
+	def __repr__(self):
+		if self.linear_intensities: u = "raw"
+		else: u = "dB"
+		if self.linear_bands: l = "linear"
+		else: l = "log"
+		return "<Butterscotch: %s blocks, %d s/block, %d %s bands, %s, %d Hz, onset %d>"%(len(self.blocks), self.secs_per_block, len(self.bands), l, u, self.highest_freq, self.audio_onset_sample)
+
+	def as_dB(self):
+		bands = self.bands.copy()
+		for n,val in enumerate(bands.flat): bands.flat[n] = calculate_dB(val)
+		b = ButterscotchSignature(bands,self.secs_per_block,self.audio_onset_sample,self.highest_freq)
+		b.linear_intensities = False
+		return b
+
+	def as_log_bands(self):
+		logblocks = numpy.vstack( [ log2_average( b ) for b in self.blocks ] )
+		logbands = logblocks.transpose()
+		b = ButterscotchSignature(logbands,self.secs_per_block,self.audio_onset_sample,self.highest_freq)
+		b.linear_bands = False
+		return b
+
+	def halve_highest_freq(self):
+		if self.linear_bands:
+			if divmod(len(self.bands),2)[1] != 0: raise ValueError, "Number of bands in original signature is odd, cannot halve odd numbers."
+			bands = self.bands[:len(self.bands)/2].copy()
+		else:
+			if len(self.bands) == 1: raise ValueError, "Number of bands == 1, cannot halve 1"
+			bands = self.bands[:len(self.bands)-1].copy()
+		b = ButterscotchSignature(bands,self.secs_per_block,self.audio_onset_sample,self.highest_freq / 2)
+		return b
+
+	def display(self,title=None,async = False):
+		try:
+			import pylab as p
+			import matplotlib.axes3d as p3 
+		except ImportError: raise ImportError, "you need to install the Matplotlib and PyLab libraries to use this feature"
+		fig=p.figure()
+		ax = p3.Axes3D(fig)
+		if title: ax.text(0,0,title)
+		xs = (numpy.arange(len(self.blocks)) * self.secs_per_block ).repeat(len(self.bands))
+		ys = list (self.freq_centerpoints()) * len(self.blocks)
+		zs = numpy.ravel(self.blocks)
+		#print self.bands.shape,len(ys),ys
+		assert len(xs) == len(zs) == len(ys)
+		ax.scatter3D(xs, ys , zs)
+		ax.set_xlabel('Time (s)')
+		if self.linear_bands: ax.set_ylabel('Frequency (linear)')
+		else: ax.set_ylabel('Frequency (log)')
+		if self.linear_intensities: ax.set_zlabel('Intensity (raw)')
+		else: ax.set_zlabel('Intensity (dB)')
+		if not async: p.show()
+
+	def correlate(self,other):
+		"""Correlates two signatures.  For performance reasons, they
+		are correlated blindly."""
+
+		corrcoef = scipy.corrcoef
+		c = 0.
+		for r1, r2 in zip(self.bands,other.bands):
+			c += corrcoef(r1,r2)[1][0]
+		return c / len(self.bands)
 
 
-class NoAudioOnset(Exception): pass # raised by wav_butterscotch
-def wav_butterscotch(f, blocks = 12, secs_per_block = 10,
-					use_dB=False,full_spectrum=False):
+class NoAudioOnset(Exception): pass
+class NotEnoughAudio(Exception): pass
 
-	if type(blocks) is not int or blocks < 1:
-		raise ValueError, "blocks must be a positive integer"
-	if secs_per_block <= 0:
-		raise ValueError, "secs_per_block must be > 0"
+
+# === the function that generates butterscotch signatures ===
+
+
+def wav_butterscotch(f,
+	num_blocks=12,
+	secs_per_block=10,
+	num_bands=64,
+	force_audio_onset=None):
+
+	if type(num_blocks) is not int or num_blocks < 1: raise ValueError, "blocks must be a positive integer"
+	if secs_per_block <= 0: raise ValueError, "secs_per_ must be > 0"
 
 	if type(f) in (str,unicode): f = wave.open(f)
+	
+	sampling_rate = f.getframerate()
+	highest_freq = sampling_rate / 2
 
-	seconds = blocks * secs_per_block
+	if force_audio_onset is None: audio_onset = find_audio_onset(f)
+	else: audio_onset = force_audio_onset
+	if audio_onset is None: raise NoAudioOnset, "could not determine onset of audio"
+	f.setpos(audio_onset)
 
-	pos = find_audio_onset(f)
-	if pos is None:
-		raise NoAudioOnset, "could not determine onset of audio"
-	f.setpos(pos)
+	block_samples = sampling_rate * secs_per_block
+	total_samples = block_samples * num_blocks
 
-	stream = read_wave(f,seconds)
-	return (pos,butterscotch(stream,f.getframerate(),
-		secs_per_block,use_dB,full_spectrum))
+	signal = read_wave(f,total_samples) # read the wave file
+	signal = signal[:len(signal)/block_samples*block_samples] # discard partial blocks
 
-
-def mp3_butterscotch(filename, blocks = 12, secs_per_block = 10,
-					use_dB=False,full_spectrum=False):
-	waveobject = decode_mp3(filename)
-	return wav_butterscotch(waveobject,blocks,
-		secs_per_block,use_dB,full_spectrum)
+	if len(signal) < block_samples: raise NotEnoughAudio, "%d samples received, at least %d samples needed"%(len(signal),block_samples)
 
 
-# correlators
+	analysis = analyze_spectrum_by_blocks(
+		signal,
+		num_bands*2,
+		block_samples).transpose().copy()
+
+	return ButterscotchSignature(
+		analysis,
+		secs_per_block,
+		audio_onset,
+		highest_freq)
 
 
-def butterscotch_correlate_by_spectrum(signature1,signature2):
-	"""Correlates two signatures.  Normally the signatures's rows are
-	the frequency bands, but if you're correlating by time instead of
-	by spectrum, a row would be the series of intensities in a particular
-	band.
-
-	If the two signatures don't match in frequency band count
-	or number of samples, the signatures are automatically compared
-	by the minimum number of frequencies and samples in all of the
-	signatures.  Silently."""
-
-	if signature1.shape != signature2.shape:
-		h = min((signature1.shape[0],signature2.shape[0]))
-		w = min((signature1.shape[1],signature2.shape[1]))
-		signature1 = signature1[0:h,0:w]
-		signature2 = signature2[0:h,0:w]
-
-	c = 0.
-	for s1row, s2row in zip(signature1,signature2):
-		c += numpy.corrcoef(s1row,s2row)[1][0]
-	return c / len(signature1)
+# === convenience functions ===
 
 
-def butterscotch_correlate_by_band(signature1,signature2):
-	signature1,signature2 = [ s.transpose() for s in (signature1,signature2) ]
-	return butterscotch_correlate_by_spectrum(signature1,signature2)
+def mp3_butterscotch(filename,*args,**kwargs):
+	return wav_butterscotch(decode_mp3(filename),*args,**kwargs)
+
+
+
+def parser(cmdline,description):
+	from optparse import OptionParser
+
+	usage = """usage: %s %s
+
+%s"""%("%prog",cmdline,description)
+
+	epilog = """This program only knows how to process 16-bit little-endian linear-encoded mono / stereo / multichannel RIFF WAVE files (MP3 files may work if mpg321 is installed).  It also doesn't know how to read from standard input or named pipes, since it needs to perform a seek in the audio file."""
+
+	parser = OptionParser(usage=usage,epilog=epilog)
+
+	parser.add_option("-d","--decibel",help="Compute decibel (dB) levels instead of raw signal values.  Useful for plotting spectrums.", action="store_true",dest="use_dB")
+	parser.add_option("-l","--log-bands",help="Logarithmically average frequency bands.  Useful for emphasis in the low- and mid-frequency ranges.", action="store_true",dest="use_log_bands")
+	parser.add_option("-s","--full-spectrum",help="Compute the full spectrum below the Nyquist frequency instead of discarding the high half.  Useful to plot the full spectrum, and to compare high frequency loss in lossly encoded files.  You can combine it with --fingerprint to get a quick ASCII representation of frequency bands.", action="store_true",dest="full_spectrum")
+
+	parser.add_option("-e","--seconds-per-block",help="Change the number of seconds per block from the default.", dest="spb", type="int", default= 10)
+	parser.add_option("-n","--num-blocks",help="Change the number of blocks from the default.", dest="blocks", type="int", default = 12)
+	parser.add_option("-b","--num-bands",help="Change the number of frequency bands from the default.  This always refer to linear bands, even when --log-bands is specified, and if --log-bands is specified, --num-bands must be a power of two.", dest="bands", type="int", default = 64)
+
+	return parser
