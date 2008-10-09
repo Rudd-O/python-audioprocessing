@@ -14,7 +14,8 @@ Your computer must have these software packages:
 
  1. Python
  2. SciPy
- 3. NumPy (python-numeric)
+ 3. NumPy
+ 4. Matplotlib
 
 All major distributions include these packages, either as default or
 in their package manager repositories.  You can get these things in

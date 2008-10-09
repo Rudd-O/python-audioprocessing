@@ -18,7 +18,7 @@ This is a toolkit of convenience functions for audio processing.
 Distributed under the GPL v3.  Copyright Manuel Amador (Rudd-O).
 """
 
-__version__ = '0.0.2'
+__version__ = '0.0.3'
 
 
 # === subprocess utilities ===
@@ -102,6 +102,17 @@ def log2_average(arr):
 # === audio processing pipelines
 
 
+def play(signal,rate=44100):
+	import alsaaudio
+	d = alsaaudio.PCM()
+	d.setchannels(1)
+	d.setformat(alsaaudio.PCM_FORMAT_S16_LE)
+	signal = signal[:rate]
+	d.setperiodsize(len(signal))
+	d.setrate(rate)
+	d.write(signal)
+
+
 def mix_down(stereosignal,channels):
 	"""Given a 1D numpy array where samples from each channel are
 	interspersed like this:
@@ -110,12 +121,16 @@ def mix_down(stereosignal,channels):
 		123456123456 (5.1)
 	returns the mono mixdown of the signal.
 	
-	Resulting stream is floating-point.  If channels=1, the stereo signal
-	is converted from int to float but no other changes take place.
+	Resulting stream is floating-point, unless channels = 1, when
+	the signal is returned exactly as it came.
 	"""
-	if channels == 1: return stereosignal * 1.
-	shape = (len(stereosignal)/channels,channels)
-	return stereosignal.reshape(shape).sum(1) / float(channels)
+	if channels == 1: return stereosignal
+
+	stereosignal = stereosignal.reshape((-1,channels))
+	stereosignal = stereosignal.mean(1)
+	#play(stereosignal.astype("int16").tostring())
+
+	return stereosignal
 
 
 def calculate_rms(chunk):
@@ -183,16 +198,17 @@ def analyze_spectrum(signal,npoints):
 	if divmod(len(signal),npoints)[1] != 0:
 		round_up = len(signal) / npoints * npoints + npoints
 		signal.resize( round_up )
-	signal = signal.reshape((-1,npoints))
 
-	hamming = scipy.signal.hamming(npoints)
-	hamming = scipy.hstack( [ hamming for x in xrange(len(signal)) ] )
-	hamming = hamming.reshape((-1,npoints))
+	window = scipy.signal.hanning(npoints)
+	window_blocks = scipy.vstack( [ window for x in xrange(len(signal) / npoints) ] )
 
-	hammed = signal * hamming
+	signal_blocks = signal.reshape((-1,npoints))
 
-	fft = numpy.fft.rfft(hammed)[:,1:]
-	result = pow(abs(fft),2) / npoints
+	windowed_signals = signal_blocks * window_blocks
+
+	ffts = numpy.fft.rfft(windowed_signals)[:,1:]
+
+	result = pow(abs(ffts),2) / npoints
 	result = result.mean(0)
 
 	return result
@@ -229,22 +245,21 @@ def dB_to_string(dB_value_list):
 
 
 def find_audio_onset(f):
-	"""Seeks a wave object to position 0, then returns the sample number where it took place, or None if it could not be found.  Position of wave object is not changed by this function."""
+	"""Seeks a wave object to position 0, then returns the sample number where it
+	took place, or None if it could not be found.  Position of wave object is not
+	changed (it's actually restored before returning) by this function."""
 
 	oldpos = f.tell()
 	try:
 		f.setpos(0) # go to first sample
-		buf = ""
+		buf = numpy.array([]) # instantiate an empty buffer
 		while f.tell() < f.getnframes():
-			frames = f.readframes(f.getframerate())
-			buf += frames
-			samples = mix_down(numpy.core.fromstring(buf,dtype=numpy.dtype("int16")),f.getnchannels())
-			pos = find_signal_onset(samples,f.getframerate())
+			buf = numpy.hstack([buf,read_wave(f,f.getframerate())])
+			assert len(buf.shape) == 1
+			pos = find_signal_onset(buf,f.getframerate())
 			if pos is not None: break
-		if pos is None: f.setpos(0)
 		return pos
-	finally:
-		f.setpos(oldpos)
+	finally: f.setpos(oldpos)
 
 
 def read_wave(f,frames):
@@ -268,6 +283,8 @@ def read_wave(f,frames):
 	frames = f.readframes(frames)
 	buf = numpy.core.fromstring(frames,dtype=numpy.dtype("int16"))
 	stream = mix_down(buf,channels)
+	#play(stream.astype("int16").tostring(),f.getframerate())
+
 	stream /= 32768.
 	return stream
 
@@ -329,7 +346,7 @@ class ButterscotchSignature:
 		else: u = "measured in dB"
 		if self.linear_bands: l = "linear"
 		else: l = "logarithmically averaged"
-		return "Butterscotch signature containing %d %d-second blocks of %d %s bands (%s), from %d to %d Hz, starting at sample %d in the original audio data."%(len(self.blocks), self.secs_per_block, len(self.bands), l, u, startfreq, endfreq, self.audio_onset_sample)
+		return "Butterscotch signature containing %d %d-second blocks of %d %s bands (%s), whose centers range from %d to %d Hz, starting at sample %d in the original audio data."%(len(self.blocks), self.secs_per_block, len(self.bands), l, u, startfreq, endfreq, self.audio_onset_sample)
 
 	def __repr__(self):
 		if self.linear_intensities: u = "raw"
@@ -339,17 +356,25 @@ class ButterscotchSignature:
 		return "<Butterscotch: %s blocks, %d s/block, %d %s bands, %s, %d Hz, onset %d>"%(len(self.blocks), self.secs_per_block, len(self.bands), l, u, self.highest_freq, self.audio_onset_sample)
 
 	def as_dB(self):
+		if not self.linear_intensities:
+			raise ValueError, "cannot convert to dB scale - already converted"
+		if not self.linear_bands:
+			raise ValueError, "cannot convert to dB scale if bands are logarithmic - try converting the other way around"
 		bands = self.bands.copy()
 		for n,val in enumerate(bands.flat): bands.flat[n] = calculate_dB(val)
 		b = ButterscotchSignature(bands,self.secs_per_block,self.audio_onset_sample,self.highest_freq)
 		b.linear_intensities = False
+		b.linear_bands = self.linear_bands
 		return b
 
 	def as_log_bands(self):
+		if not self.linear_bands:
+			raise ValueError, "cannot convert to logarithmic bands - already converted"
 		logblocks = numpy.vstack( [ log2_average( b ) for b in self.blocks ] )
 		logbands = logblocks.transpose()
 		b = ButterscotchSignature(logbands,self.secs_per_block,self.audio_onset_sample,self.highest_freq)
 		b.linear_bands = False
+		b.linear_intensities = self.linear_intensities
 		return b
 
 	def halve_highest_freq(self):
@@ -373,7 +398,6 @@ class ButterscotchSignature:
 		xs = (numpy.arange(len(self.blocks)) * self.secs_per_block ).repeat(len(self.bands))
 		ys = list (self.freq_centerpoints()) * len(self.blocks)
 		zs = numpy.ravel(self.blocks)
-		#print self.bands.shape,len(ys),ys
 		assert len(xs) == len(zs) == len(ys)
 		ax.scatter3D(xs, ys , zs)
 		ax.set_xlabel('Time (s)')
@@ -428,7 +452,6 @@ def wav_butterscotch(f,
 
 	if len(signal) < block_samples: raise NotEnoughAudio, "%d samples received, at least %d samples needed"%(len(signal),block_samples)
 
-
 	analysis = analyze_spectrum_by_blocks(
 		signal,
 		num_bands*2,
@@ -462,7 +485,7 @@ def parser(cmdline,description):
 
 	parser.add_option("-d","--decibel",help="Compute decibel (dB) levels instead of raw signal values.  Useful for plotting spectrums.", action="store_true",dest="use_dB")
 	parser.add_option("-l","--log-bands",help="Logarithmically average frequency bands.  Useful for emphasis in the low- and mid-frequency ranges.", action="store_true",dest="use_log_bands")
-	parser.add_option("-s","--full-spectrum",help="Compute the full spectrum below the Nyquist frequency instead of discarding the high half.  Useful to plot the full spectrum, and to compare high frequency loss in lossly encoded files.  You can combine it with --fingerprint to get a quick ASCII representation of frequency bands.", action="store_true",dest="full_spectrum")
+	parser.add_option("-s","--full-spectrum",help="Compute the full spectrum below the Nyquist frequency instead of discarding the high half (discarding is the default behavior).  Useful to plot the full spectrum, and to compare high frequency loss in lossly encoded files.", action="store_true",dest="full_spectrum")
 
 	parser.add_option("-e","--seconds-per-block",help="Change the number of seconds per block from the default.", dest="spb", type="int", default= 10)
 	parser.add_option("-n","--num-blocks",help="Change the number of blocks from the default.", dest="blocks", type="int", default = 12)

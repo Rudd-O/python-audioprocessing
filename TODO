@@ -1,7 +1,46 @@
 Things to do:
 
-* optimize by trying new data types and algorithms
-* write an algorithm that combines the phase beat detector and a time-domain beat detector for best results, and write a program that uses it and writes the TBPM tag on mp3
-* now that we know the FFT code is solid, we can perhaps apply the bark scale to get the appropriate buckets from the FFT, so we can compare songs
-* for a song comparison plugin for Amarok, think about the database structure that will contain these 10 second 6 buckets of spectrum amplitude
-* tune correlation thresholds in butterscotch-correlate
+* there is a bug in the wave module -- mono files's .getnchannels() method returns 2
+* write an algorithm that combines the phase beat detector and a time-domain beat detector
+  for best results, and write a program that uses it and writes the TBPM tag on mp3
+* now that we know the FFT code is solid, we can perhaps apply the bark scale to get the
+  appropriate buckets from the FFT, so we can compare songs
+* for a song comparison plugin for Amarok, think about the database structure that will
+  contain the signatures and also cached correlations between them
+* make a set of command-line tools that allow to analyze and cache those results, then
+  perform correlations, right from the command line, without the need for Amarok or
+  programming expertise
+
+* practice fadvise or find a way to decode an mp3 through pipes, sigpipe or stop the
+  decoding as soon as it gets to a certain amount of data, read the data chunked, and
+  also correctly determine sample rate (mpg321 pipe fails to do correct sample rate
+  on several input songs)
+* reduce RAM usage by loading chunk-by-chunk instead of the whole 2 minutes in RAM
+
+
+Algorithm tasks:
+
+* we need to explore several axes of the problem via correlation and graphs, to:
+
+  - increase the accuracy of correlation (same versions of the same song should
+    have very high correlations, anything else should have a drastically lower
+    correlation coefficient)
+  - make it faster (*anything* to make the correlations faster, even at the expense
+    of making the analysis slower)
+
+  I'm now exploring:
+
+  * the optimum num. of bands (8, 64, 512)
+  * log / linear bands
+    Generating large amounts of linear bands and then log-averaging them to very few
+    log bands should be much faster than comparing lots of bands
+  * dB / linear intensities
+    Not very gung-ho here, last time I tried that, correlation coefficients for similar
+    songs went to the tank.
+
+  I need to set up several experiments, one axis per aforementioned option, select several
+  pairs of songs already known to be similar and mark them, perform the autocorrelation
+  for each experiment, and visually compare which experiment yielded an acceptable
+  precision and analysis time.
+
+

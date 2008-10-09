@@ -1,3 +1,10 @@
+Version 0.0.3:
+
+* Added the ability to plot signatures in 3D (spectral analysis)
+* Added a batch operator that can store the results in a GDBM database
+* Removed butterscotch-correlate to be replaced in the future by a better
+  alternative
+
 Version 0.0.2:
 
 * Changed default signature to 32 bands [0..11025] and 12 10-second samples
