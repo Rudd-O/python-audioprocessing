@@ -47,7 +47,7 @@ pool = processing.Pool(4) #FIXME numcpus
 already = dictionary.keys()
 
 files = [ s.strip() for s in file(playlist).readlines() if s.strip() ]
-files = [ f for f in files if f.endswith(".mp3") and not f.startswith("#") and not in already ]
+files = [ f for f in files if f.endswith(".mp3") and not f.startswith("#") and not f in already ]
 
 times = [time.time()]
 def avg(lst): return sum(lst) / len(lst)
