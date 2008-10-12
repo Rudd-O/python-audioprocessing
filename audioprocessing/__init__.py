@@ -18,7 +18,7 @@ This is a toolkit of convenience functions for audio processing.
 Distributed under the GPL v3.  Copyright Manuel Amador (Rudd-O).
 """
 
-__version__ = '0.0.3'
+__version__ = '0.0.4'
 
 
 # === subprocess utilities ===
@@ -290,7 +290,10 @@ def read_wave(f,frames):
 
 
 def decode_mp3(mp3file,numframes=None,firstframe=None):
-	"""Decodes an MP3 file using mpg321, returns a wave object to a temporary file with the WAV data (file is unlinked before returning)"""
+	"""Decodes an MP3 file using mpg321, returns a wave object to a temporary file with the WAV data (file is unlinked before returning).
+	If firstframe is specified, skip decoding the N frames before it.
+	If numframes is specified, decode only N frames from the first frame on.
+	"""
 
 	if numframes is not None and ( type(numframes) is not int or numframes < 1):
 		raise TypeError, "numframes must be a positive int, not %s"%numframes
@@ -300,9 +303,10 @@ def decode_mp3(mp3file,numframes=None,firstframe=None):
 	test.close()
 
 	command = ["mpg321","--quiet"]
-	if numframes is not None: command += ["-n",str(numframes)]
 	if firstframe is not None: command += ["-k",str(firstframe)]
-
+	if numframes is not None:
+		if firstframe is None: command += ["-n",str(numframes)]
+		else: command += ["-n",str(numframes+firstframe)]
 	try:
 		wavfile_fd,wavfile = tempfile.mkstemp()
 		command += ["-w",wavfile,mp3file]
@@ -385,27 +389,18 @@ class ButterscotchSignature:
 			if len(self.bands) == 1: raise ValueError, "Number of bands == 1, cannot halve 1"
 			bands = self.bands[:len(self.bands)-1].copy()
 		b = ButterscotchSignature(bands,self.secs_per_block,self.audio_onset_sample,self.highest_freq / 2)
+		b.linear_bands = self.linear_bands
+		b.linear_intensities = self.linear_intensities
 		return b
 
-	def display(self,title=None,async = False):
-		try:
-			import pylab as p
-			import matplotlib.axes3d as p3 
-		except ImportError: raise ImportError, "you need to install the Matplotlib and PyLab libraries to use this feature"
-		fig=p.figure()
-		ax = p3.Axes3D(fig)
-		if title: ax.text(0,0,title)
-		xs = (numpy.arange(len(self.blocks)) * self.secs_per_block ).repeat(len(self.bands))
-		ys = list (self.freq_centerpoints()) * len(self.blocks)
-		zs = numpy.ravel(self.blocks)
-		assert len(xs) == len(zs) == len(ys)
-		ax.scatter3D(xs, ys , zs)
-		ax.set_xlabel('Time (s)')
-		if self.linear_bands: ax.set_ylabel('Frequency (linear)')
-		else: ax.set_ylabel('Frequency (log)')
-		if self.linear_intensities: ax.set_zlabel('Intensity (raw)')
-		else: ax.set_zlabel('Intensity (dB)')
-		if not async: p.show()
+	def halve_block_count(self):
+		if divmod(len(self.blocks),2)[1] != 0: raise ValueError, "Number of blocks in original signature is odd, cannot halve odd numbers."
+		blocks = self.blocks[:len(self.blocks)/2]
+		bands = blocks.transpose().copy()
+		b = ButterscotchSignature(bands,self.secs_per_block,self.audio_onset_sample,self.highest_freq)
+		b.linear_bands = self.linear_bands
+		b.linear_intensities = self.linear_intensities
+		return b
 
 	def correlate(self,other):
 		"""Correlates two signatures.  For performance reasons, they
@@ -426,9 +421,9 @@ class NotEnoughAudio(Exception): pass
 
 
 def wav_butterscotch(f,
-	num_blocks=12,
-	secs_per_block=10,
-	num_bands=64,
+	num_blocks=30,
+	secs_per_block=4,
+	num_bands=256,
 	force_audio_onset=None):
 
 	if type(num_blocks) is not int or num_blocks < 1: raise ValueError, "blocks must be a positive integer"
@@ -483,12 +478,12 @@ def parser(cmdline,description):
 
 	parser = OptionParser(usage=usage,epilog=epilog)
 
-	parser.add_option("-d","--decibel",help="Compute decibel (dB) levels instead of raw signal values.  Useful for plotting spectrums.", action="store_true",dest="use_dB")
-	parser.add_option("-l","--log-bands",help="Logarithmically average frequency bands.  Useful for emphasis in the low- and mid-frequency ranges.", action="store_true",dest="use_log_bands")
-	parser.add_option("-s","--full-spectrum",help="Compute the full spectrum below the Nyquist frequency instead of discarding the high half (discarding is the default behavior).  Useful to plot the full spectrum, and to compare high frequency loss in lossly encoded files.", action="store_true",dest="full_spectrum")
+	parser.add_option("-d","--decibel",help="Compute decibel (dB) levels instead of raw signal levels (the default).  Useful for plotting spectrums.", action="store_true",dest="use_dB")
+	parser.add_option("-l","--linear-bands",help="Leave the frequency bands linear instead of logarithmically averaging them (the default).  Useful for plotting spectrums.", action="store_true",dest="use_linear_bands")
+	parser.add_option("-s","--full-spectrum",help="Compute the full spectrum below the Nyquist frequency instead of discarding the high half (the default).  Useful to plot the full spectrum, and to compare high frequency loss in lossly encoded files.", action="store_true",dest="use_full_spectrum")
 
-	parser.add_option("-e","--seconds-per-block",help="Change the number of seconds per block from the default.", dest="spb", type="int", default= 10)
-	parser.add_option("-n","--num-blocks",help="Change the number of blocks from the default.", dest="blocks", type="int", default = 12)
-	parser.add_option("-b","--num-bands",help="Change the number of frequency bands from the default.  This always refer to linear bands, even when --log-bands is specified, and if --log-bands is specified, --num-bands must be a power of two.", dest="bands", type="int", default = 64)
+	parser.add_option("-e","--seconds-per-block",help="Change the number of seconds per block from the default 4.", dest="spb", type="int", default= 4)
+	parser.add_option("-n","--num-blocks",help="Change the number of blocks from the default 30.", dest="blocks", type="int", default = 30)
+	parser.add_option("-b","--num-bands",help="Change the number of frequency bands from the default 256.  This always refer to linear bands, even when --log-bands is specified, and if --log-bands is specified, --num-bands must be a power of two.  Unless --full-spectrum is also specified, the resulting bands will be the lower half and the number of bands will also be half.", dest="bands", type="int", default = 256)
 
 	return parser

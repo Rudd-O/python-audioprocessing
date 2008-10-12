@@ -30,11 +30,20 @@ parser.add_option("-p","--pickle",help="Output a pickled representation of a dic
 parser.add_option("-f","--fingerprint",help="Turn each sample into a character representation of itself, using decibel (dB) values. '0' means between 0 and -3 dB; each letter from a to z represents a -3 dB quanta.  Automatically turns --decibel on.", action="store_true",dest="fingerprint")
 parser.add_option("-g","--graph",help="Use the Matplotlib and PyLab libraries to plot the results of the signature in 3D.  Combine this with --decibel and --full-spectrum, and you get a fancy interactive 3D spectrum analyzer.", action="store_true",dest="graph")
 
+parser.add_option("-a","--analyze-spectrum",help="Useful shortcut that plots a detailed 3D spectrum analysis for each block of time.  It is equivalent to --graph --decibel --full-spectrum --linear-bands.", action="store_true", dest="analyze_spectrum")
+
 options,args = parser.parse_args()
 
 if not args:
 	parser.print_help()
 	sys.exit(os.EX_USAGE)
+
+
+if options.analyze_spectrum:
+	options.use_full_spectrum = True
+	options.use_dB = True
+	options.use_linear_bands = True
+	options.graph = True
 
 output_opts = [options.graph,options.fingerprint,options.pickle,options.text]
 
@@ -55,9 +64,9 @@ for arg in args:
 		if arg.lower().endswith("mp3"): func = a.mp3_butterscotch
 		signature = func(arg,options.blocks,options.spb,options.bands)
 
-		if not options.full_spectrum: signature = signature.halve_highest_freq()
+		if not options.use_full_spectrum: signature = signature.halve_highest_freq()
 		if options.use_dB or options.fingerprint: signature = signature.as_dB()
-		if options.use_log_bands: signature = signature.as_log_bands()
+		if not options.use_linear_bands: signature = signature.as_log_bands()
 
 		if options.pickle: dict[arg] = signature
 		if options.text:
@@ -71,17 +80,20 @@ for arg in args:
 			for row in signature.bands: print a.dB_to_string(row)
 			print ""
 		if options.graph:
-			signature.display(async=True,title=arg)
+			import audioprocessing.workbench as p
+			p.plot_butterscotch_signature(signature,title=arg,show=False)
 	except (IOError,OSError,wave.Error,NotImplementedError,
-			a.NoAudioOnset,a.NotEnoughAudio,ImportError),e:
+			a.NoAudioOnset,a.NotEnoughAudio),e:
 		onefilefailed = True
 		sys.stderr.write("%s: %s\n"%(arg,str(e)))
 		sys.stderr.flush()
+	except ImportError,e:
+		sys.stderr.write("To plot a signature, you need Matplotlib and Pylab installed\n")
+		sys.stderr.flush()
+		sys.exit(1)
 
 if options.pickle: print pickle.dumps(dict),
 if options.graph:
-	try:
-		import pylab
-		pylab.show()
-	except ImportError: pass
+	import pylab
+	pylab.show()
 if onefilefailed: sys.exit(2)

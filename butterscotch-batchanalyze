@@ -31,9 +31,9 @@ def do_one(filename):
 	try:
 		signature = audioprocessing.mp3_butterscotch(filename,
 			options.blocks,options.spb,options.bands)
-		if not options.full_spectrum: signature = signature.halve_highest_freq()
+		if not options.use_full_spectrum: signature = signature.halve_highest_freq()
 		if options.use_dB: signature = signature.as_dB()
-		if options.use_log_bands: signature = signature.as_log_bands()
+		if not options.use_linear_bands: signature = signature.as_log_bands()
 		print "%s:\n%s"%(filename,signature)
 		return (filename,signature)
 	except Exception,e:

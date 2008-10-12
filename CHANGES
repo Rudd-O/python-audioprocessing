@@ -1,3 +1,11 @@
+Version 0.0.4:
+
+* Tuned default parameters for optimum correlation coefficients
+* Cleaned up the library, splitting graphing into a separate workbench module
+* Added more options to the command-line programs
+* Documented some functions, fixed some bugs
+* The API remains unchanged, but it will change in the future
+
 Version 0.0.3:
 
 * Added the ability to plot signatures in 3D (spectral analysis)
