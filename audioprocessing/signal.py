@@ -2,7 +2,7 @@
 
 import numpy
 import math
-from audioprocessing.util import chunked
+from audioprocessing.util import chunked,in_pairs
 import scipy
 import scipy.signal
 
