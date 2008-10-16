@@ -26,6 +26,8 @@ class ButterscotchSignature:
 	self.blocks: self.blocks[N]: list of intensities for frequency N, one per band"""
 
 	def __init__(self,data,secs_per_block,audio_onset_sample,highest_freq):
+		if data.dtype != numpy.dtype("float32"):
+			 data = data.astype("float32")
 		self.bands = data
 		self.blocks = data.transpose()
 		self.audio_onset_sample = audio_onset_sample
