@@ -111,10 +111,10 @@ class ButterscotchSignature:
 		return c / len(self.bands)
 
 
-class NotEnoughAudio(Exception): pass
-
-
 # === the function that generates butterscotch signatures ===
+
+
+class NotEnoughAudio(Exception): pass
 
 
 def butterscotch(f,
@@ -192,3 +192,16 @@ def parser(cmdline,description):
 	parser.add_option("-b","--num-bands",help="Change the number of frequency bands from the default 256.  This always refer to linear bands, even when --log-bands is specified, and if --log-bands is specified, --num-bands must be a power of two.  Unless --full-spectrum is also specified, the resulting bands will be the lower half and the number of bands will also be half.", dest="bands", type="int", default = 256)
 
 	return parser
+
+
+__all__ = [
+ 	'butterscotch',
+	'mp3_butterscotch',
+	'wav_butterscotch',
+	'signal',
+	'stream',
+	'util',
+	'parser',
+	'ButterscotchSignature',
+	'NotEnoughAudio',
+]

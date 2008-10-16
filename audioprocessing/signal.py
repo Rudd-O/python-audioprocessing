@@ -71,3 +71,13 @@ def dB_to_char(dB_value):
 
 def dB_to_string(dB_value_list):
 	return "".join([ dB_to_char(val) for val in dB_value_list ])
+
+
+__all__ = [
+	'calculate_rms',
+	'calculate_rms_dB',
+	'calculate_dB',
+	'analyze_spectrum',
+	'dB_to_char',
+	'dB_to_string',
+]

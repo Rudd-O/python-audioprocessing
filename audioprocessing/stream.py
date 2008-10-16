@@ -176,3 +176,14 @@ if __name__ == "__main__":
 	data = (data * 32768).astype("int16").tostring()
 	play(data)
 
+
+__all__ = [
+	'WaveStream',
+	'NumPyStream',
+	'FloatStream',
+	'MonoStream',
+	'AudioOnsetDiscarder',
+	'NoAudioOnset',
+	'MP3Decoder',
+	'decode',
+]

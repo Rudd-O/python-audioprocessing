@@ -56,3 +56,12 @@ def play(signal,rate=44100):
 	for s in chunked(signal,rate*2):
 		print "writing %s"%len(s)
 		d.write(s)
+
+
+__all__ = [
+	'chunked',
+	'in_pairs',
+	'deltas',
+	'log2_average',
+	'play',
+]
