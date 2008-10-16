@@ -106,8 +106,9 @@ class ButterscotchSignature:
 
 		corrcoef = scipy.corrcoef
 		c = 0.
+		minimum = min( [ len(self.bands[0]) , len(other.bands[0]) ] )
 		for r1, r2 in zip(self.bands,other.bands):
-			c += corrcoef(r1,r2)[1][0]
+			c += corrcoef(r1[:minimum],r2[:minimum])[1][0]
 		return c / len(self.bands)
 
 
