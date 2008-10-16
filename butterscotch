@@ -7,6 +7,7 @@ Distributed under the GPL v3.  Copyright Manuel Amador (Rudd-O).
 """
 
 import audioprocessing as a
+import audioprocessing.stream as sgn
 import pickle
 import wave
 import sys
@@ -77,13 +78,13 @@ for arg in args:
 		if options.fingerprint:
 			print "%s:"%arg
 			print signature
-			for row in signature.bands: print a.dB_to_string(row)
+			for row in signature.bands: print sgn.dB_to_string(row)
 			print ""
 		if options.graph:
 			import audioprocessing.workbench as p
 			p.plot_butterscotch_signature(signature,title=arg,show=False)
 	except (IOError,OSError,wave.Error,NotImplementedError,
-			a.NoAudioOnset,a.NotEnoughAudio),e:
+			sgn.NoAudioOnset,a.NotEnoughAudio),e:
 		onefilefailed = True
 		sys.stderr.write("%s: %s\n"%(arg,str(e)))
 		sys.stderr.flush()
