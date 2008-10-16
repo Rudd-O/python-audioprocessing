@@ -151,10 +151,31 @@ class MP3Decoder(WaveStream):
 		del self.pipe
 		del self.popen
 
+
+class FLACDecoder(WaveStream):
+
+	def __init__(self,mp3file):
+		command = ["flac","-d","-c","--silent"]
+		command += [mp3file]
+		bufsize = 0
+		self.popen = subprocess.Popen(command,stdout=subprocess.PIPE,bufsize=bufsize)
+		self.pipe = self.popen.stdout
+		WaveStream.__init__(self,wave.open(self.pipe))
+
+	def close(self):
+		try: self.pipe.close()
+		except Exception: pass
+		threading.Thread(target=self.popen.wait).start()
+		del self.pipe
+		del self.popen
+
+
 def decode(filename):
 	"""Auto-chooses the appropriate decoder for the file name passed,
 	returns a WaveStream object with it."""
+	# FIXME: make it detect based on content, not on extension
 	if filename.lower().endswith(".mp3"): return MP3Decoder(filename)
+	if filename.lower().endswith(".flac"): return FLACDecoder(filename)
 	return WaveStream(wave.open(file(filename)))
 
 
@@ -186,5 +207,6 @@ __all__ = [
 	'AudioOnsetDiscarder',
 	'NoAudioOnset',
 	'MP3Decoder',
+	'FLACDecoder',
 	'decode',
 ]
