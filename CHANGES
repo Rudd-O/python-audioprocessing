@@ -1,3 +1,10 @@
+Version 0.0.5:
+
+* Reorganized the code into separate submodules
+* Implemented a streaming model that does not require decoding of the
+  entire file and does not use temporary files
+* Boosted song analysis performance by 2X with the streaming model
+
 Version 0.0.4:
 
 * Tuned default parameters for optimum correlation coefficients
