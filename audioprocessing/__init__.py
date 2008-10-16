@@ -114,7 +114,10 @@ class ButterscotchSignature:
 # === the function that generates butterscotch signatures ===
 
 
-class NotEnoughAudio(Exception): pass
+class NotEnoughAudio(Exception):
+	"""butterscotch() raises this exception if the supplied audio file
+	does not contain enough audio data for the first block."""
+	pass
 
 
 def butterscotch(f,
@@ -122,6 +125,7 @@ def butterscotch(f,
 	secs_per_block=4,
 	num_bands=256,
 	force_audio_onset=None):
+	"""Compute a Butterscotch signature for the given path name."""
 
 	if type(num_blocks) is not int or num_blocks < 1: raise ValueError, "blocks must be a positive integer"
 	if secs_per_block <= 0: raise ValueError, "secs_per_ must be > 0"
@@ -135,6 +139,9 @@ def butterscotch(f,
 			)
 		)
 	)
+
+	if f.getframerate() != 44100:
+		raise NotImplementedError, "Reading from files not 44100 Hz not implemented, because we would need to adjust the number of points in the FFT to scale, and we are too lazy to program that yet!"
 
 	sampling_rate = f.getframerate()
 	highest_freq = sampling_rate / 2
@@ -165,14 +172,18 @@ def butterscotch(f,
 
 
 def wav_butterscotch(filename,*args,**kwargs):
+	"""Compatibility function.  Just runs butterscotch()."""
 	return butterscotch(filename,*args,**kwargs)
 
 
 def mp3_butterscotch(filename,*args,**kwargs):
+	"""Compatibility function.  Just runs butterscotch()."""
 	return butterscotch(filename,*args,**kwargs)
 
 
 def parser(cmdline,description):
+	"""Convenient command line parser for common options in all console
+	programs shipped on this suite."""
 	from optparse import OptionParser
 
 	usage = """usage: %s %s
