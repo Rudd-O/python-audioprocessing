@@ -88,8 +88,8 @@ class AudioOnsetDiscarder(WaveStream):
 		assert wave.getnchannels() == 1
 		WaveStream.__init__(self,wave)
 		
-		chunksize = self.getframerate() / 4000
-		threshold = 9
+		chunksize = self.getframerate() / 2000
+		threshold = 5
 
 		chunk = self.wave.readframes(chunksize)
 		position = len(chunk)
@@ -163,6 +163,7 @@ if __name__ == "__main__":
 	import sys
 
 	print "\nMP3Decoder"
+	print sys.argv[1]
 	o = AudioOnsetDiscarder(MonoStream(FloatStream(NumPyStream(decode(sys.argv[1])))))
 
 	print o.audio_onset_sample
