@@ -17,7 +17,7 @@ setup(
 	author = 'Manuel Amador (Rudd-O)',
 	author_email = 'rudd-o@rudd-o.com',
 	license = "GPL",
-	url = 'http://projects.rudd-o.com/python-audioprocessing',
+	url = 'http://rudd-o.com/new-projects/python-audioprocessing',
 	packages = ['audioprocessing'],
 	scripts = ["butterscotch","butterscotch-batchanalyze"],
 	keywords = "audio signal processing fft spectrum analyzer",

@@ -25,7 +25,7 @@ def calculate_rms_dB(chunk,zero_dB_equiv=1.0):
 	return 0 dB.  If a single sample is passed, the peak dB power level
 	of that sample is calculated instead."""
 	try: return 10 * math.log10 ( calculate_rms(chunk) / float(zero_dB_equiv) )
-	except OverflowError: return -numpy.inf
+	except (ValueError,OverflowError): return -numpy.inf
 
 calculate_dB = calculate_rms_dB
 

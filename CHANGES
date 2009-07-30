@@ -1,3 +1,8 @@
+Version 0.0.6:
+* Apparently, when passing all zero values in the chunk to calculate_dB
+  makes it fail with a ValueError (math domain error).  Now I am trapping
+  that just like I'm trapping OverflowError.
+
 Version 0.0.5:
 
 * Reorganized the code into separate submodules

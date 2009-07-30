@@ -7,7 +7,7 @@ Its main feature is the [ButterScotch Butterscotch signature] generator,  which 
 The instrumental goal of these algorithms is to robustly identify the same songs released in different albums (but not different takes of said song).  The end goal is to unify the collection statistics of the [http://amarok.kde.org/ Amarok] music player, so that when a song's rating or value changes, that change is propagated to copies of that same song in different albums.  Enterprising users will also be able to use this software to weed out poor-sounding duplicates from their collection -- perhaps even in an automated fashion -- in the future.
 
 You can find the latest news and versions of this software at:
-  http://projects.rudd-o.com/python-audioprocessing
+  http://rudd-o.com/new-projects/python-audioprocessing
 
 == What it requires ==
 

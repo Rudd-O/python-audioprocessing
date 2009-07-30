@@ -14,7 +14,7 @@ This is a toolkit of convenience functions for audio processing.
 Distributed under the GPL v3.  Copyright Manuel Amador (Rudd-O).
 """
 
-__version__ = '0.0.5'
+__version__ = '0.0.6'
 
 
 # === signatures ===
