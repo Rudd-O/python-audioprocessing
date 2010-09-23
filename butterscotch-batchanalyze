@@ -54,7 +54,7 @@ for filename, result in pool.imap_unordered(do_one,files):
 	times.append(time.time())
 	if not result: continue
 	since_last = times[-1] - times[-2]
-	average = avg(tuple(audioprocessing.deltas(times)))
+	average = avg(tuple(audioprocessing.util.deltas(times)))
 	num_processed = len(times) - 1
 	num_left = len(files) - num_processed
 	eta = average * num_left
