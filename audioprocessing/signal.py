@@ -24,8 +24,10 @@ def calculate_rms_dB(chunk,zero_dB_equiv=1.0):
 	maximum value, so an RMS power level equal to max should
 	return 0 dB.  If a single sample is passed, the peak dB power level
 	of that sample is calculated instead."""
-	try: return 10 * math.log10 ( calculate_rms(chunk) / float(zero_dB_equiv) )
-	except (ValueError,OverflowError): return -numpy.inf
+	normalized = calculate_rms(chunk) / float(zero_dB_equiv)
+	if normalized == 0.0: return -numpy.inf
+	try: return 10 * math.log10 ( normalized )
+	except OverflowError: return -numpy.inf
 
 calculate_dB = calculate_rms_dB
 
