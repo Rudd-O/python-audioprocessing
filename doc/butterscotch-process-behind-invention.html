@@ -1,0 +1,599 @@
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en"><head>
+
+    <meta http-equiv="Content-Type" content="text/html;charset=utf-8">
+
+    <meta name="generator" content="Plone - http://plone.org">
+
+    <!-- Internet Explorer fix, forces IE8 into newest possible rendering
+         engine even if it's on an intranet. This has to be defined before any
+         script/style tags. -->
+    <meta http-equiv="X-UA-Compatible" content="IE=edge"> 
+
+    
+      <base href="http://oldzope.rudd-o.com/Rudd-O.com/new-projects/python-audioprocessing/documentation/manuals/butterscotch-the-process-behind-its-invention/"><!--[if lt IE 7]></base><![endif]-->
+    
+
+    <title>Butterscotch: the process behind its invention — Rudd-O.com</title>
+
+  
+  
+    
+    
+    
+    
+    
+    <meta content="A practical application of FFTs and statistical analysis on music." name="DC.description">
+    <meta content="A practical application of FFTs and statistical analysis on music." name="description">
+    <meta content="text/plain" name="DC.format">
+    <meta content="Reference Manual" name="DC.type">
+    <meta content="RuddO" name="DC.creator">
+    <meta content="2008-12-04 12:08:23" name="DC.date.modified">
+    <meta content="2008-12-04 12:02:12" name="DC.date.created">
+    <meta content="en" name="DC.language">
+
+    
+
+    <link rel="shortcut icon" type="image/x-icon" href="http://oldzope.rudd-o.com/Rudd-O.com/favicon.ico">
+
+
+
+    <link rel="home" href="http://oldzope.rudd-o.com/Rudd-O.com" title="Front page">
+
+    <link rel="contents" href="http://oldzope.rudd-o.com/Rudd-O.com/sitemap" title="Site Map">
+
+
+
+
+
+
+    <link rel="search" href="http://oldzope.rudd-o.com/Rudd-O.com/search_form" title="Search this site">
+
+
+
+    <!-- Disable IE6 image toolbar -->
+    <meta http-equiv="imagetoolbar" content="no">
+    
+    
+    
+
+    
+    
+
+    
+    
+
+    
+    
+
+  </head>
+
+  <body class="section-new-projects template-referencemanual-all-pages" dir="ltr">
+    <div id="visual-portal-wrapper">
+
+      
+
+      
+
+      <table id="portal-columns">
+        <tbody>
+          <tr>
+            
+            
+            
+
+            
+            <td id="portal-column-content">
+
+              
+                <div class="">
+
+                  
+
+
+                  <div id="region-content" class="documentContent">
+
+                    
+                    
+                    
+                    <a name="documentContent"></a>
+
+                    
+
+    
+
+
+                    
+                    
+
+                    
+                    <div id="content">
+                      
+                      <div>
+
+    <div>
+
+        
+
+        <h1>
+            <img src="http://oldzope.rudd-o.com/Rudd-O.com/referencemanual_icon.gif" alt="" title="Reference manual" height="16" width="16">
+            Butterscotch: the process behind its invention
+        </h1>
+
+        
+
+        <div class="documentDescription">A practical application of FFTs and statistical analysis on music.</div>
+        
+        
+    
+        <div class="referenceManualCollation depth-1">
+
+            <h1>
+                1.
+                The problem
+            </h1>
+
+            <div class="documentDescription">Collection-based players help you organize your music.  But they can help even more.</div>
+    
+            <div id="bodyContent">
+                
+                    
+<ul><li>Twenty thousand songs.
+</li><li>Hundreds of full albums and compilations.
+</li><li>Half a thousand duplicates.
+</li></ul>
+<p>
+As an user of <span class="link-external"><a class="ext-link" href="http://amarok.kde.org/"><span class="icon">the single greatest music player ever invented</span></a></span>, and an avid collector of music, our hypothetical (yet very real) music fan has a problem however you slice it.</p>
+<p>
+Should he want to remove duplicates, he has to do so manually, relying
+on (oftentimes incorrect) meta information. 'Manually', in this
+context, means manually trolling through his collection, and cueing
+songs by the same artist with the same or similar names (in the best
+case scenario). No one has time to troll through twenty thousand songs,
+and troll again every time a track is incorporated to his collection.
+And once a duplicate has been spotted, which one of the two (...N?)
+songs should be deleted?</p>
+<p>Should he prefer to keep his full albums and compilations instact,
+the problem is statistical. Collection-based players can tell you which
+song is your favorite by virtue of tracking how many times and how
+frequently you listen to particular songs. Two files from different
+albums with the same audio material (same edit of the song) should
+therefore share the rating and score. In practice, listening to copy A
+of track X does not raise the score of copy B of the same track X,
+rendering robotic "favorite lists" moot. This is a problem because
+contemporary music players such as Amarok can fill up portable music
+devices automatically according to a set of criteria including
+user-supplied ratings and automatically-computed scores. This means
+that duplicate tracks find their way into portable music devices, and
+real favorites don't. The user must thus revert to manual management of
+his portable music collection.</p>
+<p>For both user stories, acquisition of new music exacerbates the
+problem. What's the likelihood that a track X is already present in a
+large collection? If so, what's the point of adding another copy of X
+to it?</p>
+<p>In summary: duplicate tracks pose practical problems for people who
+just want to listen to their favorite music. Either the user wants to
+delete duplicates, or he wants the scores and ratings accurately
+tracked.</p>
+<p>
+Hmmmm... aren't computers supposed to be good at crunching data and making decisions?</p>
+
+                
+                
+            </div>
+
+            
+
+        </div>        
+    
+    
+        <div class="referenceManualCollation depth-1">
+
+            <h1>
+                2.
+                Fundamental principles and goals
+            </h1>
+
+            <div class="documentDescription">What we are trying to accomplish here.</div>
+    
+            <div id="bodyContent">
+                
+                    
+<p>
+What we want is a smart computer program that is able to identify
+duplicate songs. This document does not concern itself with the user
+interface of said program -- it may be in the forms of:</p>
+<ul><li>a standalone tool that will present the user with duplicates and enable him to quickly weed out duplicates, or
+</li><li>a background service that will transparently fix music
+players' statistics so they present a coherent and accurate view of the
+music fan's preferences.
+</li></ul>
+<p>The problem is not really how the program should look
+like, but how reliably it identifies duplicates. For the record, I
+chose the second path for myself.</p>
+<h3 id="Sowhatsaduplicate">So what's a duplicate?<span class="link-external"><a title="Link to this section" class="anchor" href="http://projects.rudd-o.com/python-audioprocessing/wiki/FourierAndCorrelationsAppliedToSongAnalysis#Sowhatsaduplicate"> ¶</a></span></h3>
+<p>
+For the purposes of this document, X is a duplicate of Y if:</p>
+<ul><li>X is the same song edit/mix as Y,
+</li><li>X and Y are indistinguishable aside from linear volume or minor EQ changes,
+</li><li>neither X or Y are parts of a megamix (i.e., crossfaded in
+mixes intended to be listened from start to end) -- arguably, the user
+would like to either keep those songs intact or would not consider them
+to be the same for ratings and scoring purposes.
+</li></ul>
+<p>In other words, if X and Y are the same song, the same
+edit by the same artist, but they were released in different albums,
+they should be recognized as duplicates. Particularly regardless of:</p>
+<ul><li>incompletenesss: if X is incomplete, Y and X should still match
+so the user can make an informed decision to kill or replace the
+incomplete song.
+</li><li>different tempos: common sense dictates that re-tempoed songs
+should not share the same ratings and scores, nor would anyone
+recognize re-tempoed songs as the same content of the original ones.
+</li><li>different encoding quality: if X and Y are the same song but
+X was encoded at a considerably lower bitrate than Y, X and Y should
+still match so the user can remove or ban the lower-quality version of
+the song.
+</li></ul>
+
+                
+                
+            </div>
+
+            
+
+        </div>        
+    
+    
+        <div class="referenceManualCollation depth-1">
+
+            <h1>
+                3.
+                The anatomy of a hypothetical workable solution
+            </h1>
+
+            <div class="documentDescription">What can get us to our goal.</div>
+    
+            <div id="bodyContent">
+                
+                    
+<p>
+All techniques to analyze and compare songs boil down to this:</p>
+<ul><li>Use an algorithm to compute a practical, usable representation
+of each song that preserves the features one wants to compare against.
+</li><li>Use a different algorithm to compare the representations of
+each song with the representations of every other available song. The
+comparison should map to a single value that will represent "duplicate
+/ not duplicate" for the purposes of automated decision-making.
+</li></ul>
+<h3 id="Existingtechniques">Existing techniques<span class="link-external"><a title="Link to this section" class="anchor" href="http://projects.rudd-o.com/python-audioprocessing/wiki/FourierAndCorrelationsAppliedToSongAnalysis#Existingtechniques"> ¶</a></span></h3>
+<p>
+There are a variety of techniques that can be used to weed duplicates out.  Here are some of them, and why they are ruled out:</p>
+<ul><li>Hashing and comparison of on-disk file data. Effective to
+discover exact duplicates. However, sensitive to minute changes in
+on-disk representation that amount to no audible difference.
+</li><li>Hashing and comparison of raw, decoded data. Effective to
+discover duplicates with different metadata. Sensitive to encoding
+parameters.
+</li><li>Identification and comparison of melody sequences and subsets
+thereof. Not useful, since we want to distinguish different cuts/mixes
+of the same track.
+</li></ul>
+<p>What we need is some form of representation and
+comparison that will result in high values for songs that sound
+"extremely alike" (i.e. vitually indistinguishable), and low values for
+songs that are perceptually different. We also need that both processes
+(the feature computation/extraction and the comparison) be fast.
+Especially the comparison, since it is an O(n*n) process.</p>
+<p>
+Turns out, there isn't much new science to do.</p>
+
+                
+                
+            </div>
+
+            
+
+        </div>        
+    
+    
+        <div class="referenceManualCollation depth-1">
+
+            <h1>
+                4.
+                Designing Butterscotch
+            </h1>
+
+            <div class="documentDescription">The specific problems we need to solve in the domain of audio.</div>
+    
+            <div id="bodyContent">
+                
+                    
+<p>
+Butterscotch is a combination feature extraction and comparison
+algorithm that combines well-studied techniques for audio analysis in
+the digital domain.</p>
+<p>
+I knew two things:</p>
+<ul><li>duplicate songs have nearly identical spectrographs,
+</li><li>duplicate songs may have different start times (song X from disc A may start half a second later than song Y from disc B).
+</li></ul>
+<h3 id="TheButterscotchalgorithms">The Butterscotch algorithms<span class="link-external"><a title="Link to this section" class="anchor" href="http://projects.rudd-o.com/python-audioprocessing/wiki/FourierAndCorrelationsAppliedToSongAnalysis#TheButterscotchalgorithms"> ¶</a></span></h3>
+<p>
+The problem was easy (or so I thought):</p>
+<ul><li>Find the "onset of audio" mark in the song. I briefly
+experimented and settled on 2dB RMS increases in 11 ms windows as
+reliable markers of "onset of audio".
+</li><li>Read a preset, meaningful amount of data from that point onwards, and chunk it in 10-second blocks.  I used 12 blocks.
+</li><li>For each block, compute FFT representations (spectrum
+analyses). I used 64-point real FFTs (32 non-DC resulting bands) to
+begin with. The high half of the bands was to be thrown out because
+poor encoders also throw out lots of high frequencies, so that half
+wasn't going to be meaningful for this process.
+</li><li>Compare the FFT of each block in X to the FFT of the
+corresponding block in Y. using some sort of function. My experiments
+showed that correlation was the optimum comparison process, and that
+correlation coefficients from each comparison of two songs should be
+averaged.
+</li></ul>
+<p>Ideally, there is a correlation threshold (or band) above
+which "X and Y are duplicate", and below which the opposite holds. This
+should hold true for all songs in a collection, so if correlating two
+non-duplicates results in a higher value than the lowest correlation of
+two real duplicate songs, the algorithm is not very good. That is what
+we refer to as a "false positive" or "false negative". depending on
+which threshold is chosen.</p>
+<h3 id="Correlationbetweenspectrumsvs.time-basedbandcorrelations">Correlation between spectrums vs. time-based band correlations<span class="link-external"><a title="Link to this section" class="anchor" href="http://projects.rudd-o.com/python-audioprocessing/wiki/FourierAndCorrelationsAppliedToSongAnalysis#Correlationbetweenspectrumsvs.time-basedbandcorrelations"> ¶</a></span></h3>
+<p>Having watched too many spectrographs, I started with the assumption
+that the frequency representations of duplicate songs were strongly
+related. That is, correlating the intensities of song X and song Y in a
+particular block of audio should yield me a near-perfect correlation.
+That assumption turned out to be very, very wrong, throwing too many
+false positives and negatives. In other words, many songs share
+unbelievably similar intensities in each frequency band for blocks of
+audio, while imperceptible EQ differences in otherwise "identical"
+songs threw correlation in the tank.</p>
+<p>However, what did turn out to be correct is that correlating time
+series from corresponding bands was a much, much better predictor of
+similarity. In other words, let's assume that the feature extractor
+creates a two-dimensional array, where the rows are to be interpreted
+as spectrums, and the columns are time series for a particular band. I
+was trying to correlate row-by-row, when in reality column-by-column
+was much, much better.</p>
+<p>I presume there is a common sense explanation for this: as long as
+the "onset of audio" is accurate, an increase in intensity from time
+block N to time block N+1 for any particular band in song X is
+obviously going to be accompanied by the same linear increase in
+intensity in song Y. In other words, if there's a bass playing in
+seconds 26-36, that will hold true for both X and Y.</p>
+<h3 id="Linearintensitiesvs.dBvalues">Linear intensities vs. dB values<span class="link-external"><a title="Link to this section" class="anchor" href="http://projects.rudd-o.com/python-audioprocessing/wiki/FourierAndCorrelationsAppliedToSongAnalysis#Linearintensitiesvs.dBvalues"> ¶</a></span></h3>
+<p>I briefly toyed with feature extractions of decibel-based values. My
+experiments showed that using dBs instead of raw values hurt
+correlation significantly, muddying the results.</p>
+<h3 id="CorrelationtimeisinOnn">Correlation time is in O(n*n)<span class="link-external"><a title="Link to this section" class="anchor" href="http://projects.rudd-o.com/python-audioprocessing/wiki/FourierAndCorrelationsAppliedToSongAnalysis#CorrelationtimeisinOnn"> ¶</a></span></h3>
+<p>My experiments showed me that feature extractions of anything below
+32 bands are prone to false positives and false negatives. Problem is,
+correlating anything above that is prohibitively expensive in my
+computer. Correlating features of one song against a thousand other
+songs took over 25 seconds in my machine. Divide that time over 1000,
+and multiply it by 20000 * 20000 and you get an idea of the magnitude
+of the problem.</p>
+<p>In other words, duplicate the number of bands and you increase
+correlation precision by a just bit, but you just quadrupled the time
+you need to correlate your entire collection.</p>
+<h3 id="Logarithmicallyaveragedbands">Logarithmically averaged bands<span class="link-external"><a title="Link to this section" class="anchor" href="http://projects.rudd-o.com/python-audioprocessing/wiki/FourierAndCorrelationsAppliedToSongAnalysis#Logarithmicallyaveragedbands"> ¶</a></span></h3>
+<p>What if, instead of performing 2048-point FFTs (therefore 1024
+correlations for each song pair) and then averaging the correlation
+coefficients, we only had to perform 10? Would that not speed up the
+correlation process dramatically?</p>
+<p>
+Turns out, it does.  Not only that, but it improves correlations superbly.  When we use logarithmically averaged bands.</p>
+<p>I use a simple process where we divide the resulting bands from the
+feature extraction in half, average the right half (resulting in one
+wide band for the high frequencies) and perform the same process again,
+recursively, for the left half. I can get away with this because the
+difference between 440 and 441 Hz is more significant that the
+difference between 4400 and 4401 Hz.</p>
+<p>
+Two birds with one stone:</p>
+<ol><li>Correlation speeds up by a factor of 100.
+</li><li>Insignificant differences in the frequency domain get averaged out.  However, the correlation in the time domain stays the same.
+</li></ol>
+
+                
+                
+            </div>
+
+            
+
+        </div>        
+    
+    
+        <div class="referenceManualCollation depth-1">
+
+            <h1>
+                5.
+                Tuning the parameters
+            </h1>
+
+            <div class="documentDescription">What are the ideal parameters to our generic algorithm?</div>
+    
+            <div id="bodyContent">
+                
+                    
+<p>
+We need to find the ideal feature characteristics for the Butterscotch
+feature extractor. Ideal, in this sense, is defined by how big is the
+difference between the highest correlation for non-identical songs, and
+the lowest correlation for identical songs, so that we can reliably set
+a threshold and trust that the threshold will be enough to make an
+automated decision. The parameters can be tuned along the following
+axes of the problem space:</p>
+<ol><li>Number of bands (in other words: number of points in the FFT)
+</li><li>Linear bands (constant width) vs. logarithmic bands (constant Q)
+</li><li>Number of blocks.
+</li><li>Block length (in seconds)
+</li></ol>
+<p>
+Here is how the process of tuning the parameters went along.</p>
+<h3 id="Productionofalistofsongs">Production of a list of songs<span class="link-external"><a title="Link to this section" class="anchor" href="http://projects.rudd-o.com/python-audioprocessing/wiki/FourierAndCorrelationsAppliedToSongAnalysis#Productionofalistofsongs"> ¶</a></span></h3>
+<p>I used Amarok to select a fairly manageable number of tracks, some
+of which were positively duplicates. 500 songs were my test sample.</p>
+<h3 id="Productionofapositivelistofduplicates">Production of a positive list of duplicates<span class="link-external"><a title="Link to this section" class="anchor" href="http://projects.rudd-o.com/python-audioprocessing/wiki/FourierAndCorrelationsAppliedToSongAnalysis#Productionofapositivelistofduplicates"> ¶</a></span></h3>
+<p>A list of duplicates contains groups of songs that are identical,
+determined by manual hearing of all tracks. This list was used to:</p>
+<ol><li>separate known duplicates in printouts,
+</li><li>visually distinguish them in 3D scatter graphs.
+</li></ol>
+<p>
+Coming up with this list was harder work than coming up with the initial playlist.</p>
+<h3 id="Featureextraction">Feature extraction<span class="link-external"><a title="Link to this section" class="anchor" href="http://projects.rudd-o.com/python-audioprocessing/wiki/FourierAndCorrelationsAppliedToSongAnalysis#Featureextraction"> ¶</a></span></h3>
+<p>The feature extraction was done by the command
+butterscotch-batchanalyze. To explore different axes of the problem, I
+used features of the software that allowed me to reduce the resolution
+of each feature along various axes. Thus, after generating N-block
+samples of linear bands, I could generate features of N/2-block samples
+or features with logarithmic bands at nary an additional cost.</p>
+<p>Then, I correlated the results of each experiment in batches. I kept
+the results of the feature extractions and correlations on separate
+files on disk, which allowed me to quickly switch between data sets and
+plot them simultaneously onscreen.</p>
+<h3 id="Visualizingtheresultseffectively">Visualizing the results effectively<span class="link-external"><a title="Link to this section" class="anchor" href="http://projects.rudd-o.com/python-audioprocessing/wiki/FourierAndCorrelationsAppliedToSongAnalysis#Visualizingtheresultseffectively"> ¶</a></span></h3>
+<p>I plotted the results of several different feature extraction batch
+processes (with different parameters), in 3D space -- the Z axis was
+the correlation. The positive list of duplicates is shown with a
+different type of marker that makes it easy to spot. Also, the bottom
+half of the positive matches and the top half of the rest are displayed
+with the purposes of discovering duplicates missed in the production of
+the positive list, and comparing raw correlation coefficients. I had to
+trim the tentative negative matches to about 2000 points or so, because
+my computer was unable to handle larger data volumes in an effective
+manner.</p>
+<p>This graph invariably looked like two stacked clouds: the one on top
+always a cluster of positively duplicate songs, and the one at the
+bottom a cluster of positively nonduplicates, separated by a clear "no
+man's land" where very few correlations were plotted. This graph was
+chosen because it was a very effective representation to quickly spot
+false negatives (known duplicates creeping down into the nonduplicate
+song cloud) and false positives (nonduplicates creeping into the known
+duplicate cloud).</p>
+<p>
+With this tool, I could test my experiments effectively.</p>
+<h3 id="Resultsoftheexperiments:observations">Results of the experiments: observations<span class="link-external"><a title="Link to this section" class="anchor" href="http://projects.rudd-o.com/python-audioprocessing/wiki/FourierAndCorrelationsAppliedToSongAnalysis#Resultsoftheexperiments:observations"> ¶</a></span></h3>
+<ul><li>Logarithmic bands are more effective and computationally much.
+much faster in correlation time than their linear band counterparts.
+The logarithmic averaging process is a bargain.
+</li><li>The optimum number of points for the FFT is 512, which
+results in 256 linear bands up to 22.05 KHz, which results in 128 bands
+up to 11.025 KHz, which then (as pointed earlier) get averaged down to
+8 logarithmic bands whose center points lie between 86 and 8311 Hz. The
+command line options for this result are -num-bands 256 --log-bands.
+This causes the wav_butterscotch() function to be invoked with
+num_bands=256, and the results munged with the halve_highest_freq() and
+as_log_bands() methods.
+</li><li>Reducing the number of blocks from 2 minutes to 1 minute (6
+10-second blocks) threw a wild array of false positives for songs whose
+bridges were different later on in the songs.
+</li><li>Reducing block resolution to 20 seconds while moving to 6
+blocks per song produced a negative gap between the lowest positively
+duplicates and the highest positively nonduplicates. On the contrary,
+increasing block resolution to 5 seconds and block count to 24 actually
+increased the gap almost 0.03 between the strongest nonduplicate
+correlation and weakest duplicate correlation. 30 4-second blocks were
+even better, increasing the gap by more than 0.06, and leading to very
+distinct clouds.
+</li></ul>
+<p>My conclusions point to these results as the best: 256
+bands, half-spectrum, logarithmically averaged (eight total bands)
+sampled 30 times for 4 seconds each.</p>
+
+                
+                
+            </div>
+
+            
+
+        </div>        
+    
+    
+        <div class="referenceManualCollation depth-1">
+
+            <h1>
+                6.
+                Unsolved problems
+            </h1>
+
+            <div class="documentDescription">Nitpicks and problems that need solving to perfect the algorithm.</div>
+    
+            <div id="bodyContent">
+                
+                    
+<ol><li>Otherwise exactly identical songs with different lyrics (say,
+French version vs. English version) performed by the same performer
+correlate very highly. Obviously, those songs aren't "duplicates" under
+the Butterscotch definition.
+</li></ol>
+
+                
+                
+            </div>
+
+            
+
+        </div>        
+    
+
+        
+    </div>
+
+</div>
+                    </div>
+                    
+
+                    
+                    
+                      
+
+                    
+                    
+
+                    
+                    
+
+                  </div>
+
+                </div>
+
+              
+            </td>
+            
+
+            
+            
+            
+          </tr>
+        </tbody>
+      </table>
+      
+
+      
+      
+      
+
+      
+
+        
+
+  
+
+
+
+
+      
+
+      
+    </div>
+
+
+
+
+</body></html>

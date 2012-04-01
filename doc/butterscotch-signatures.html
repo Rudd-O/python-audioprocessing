@@ -1,0 +1,299 @@
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en"><head>
+
+    <meta http-equiv="Content-Type" content="text/html;charset=utf-8">
+
+    <meta name="generator" content="Plone - http://plone.org">
+
+    <!-- Internet Explorer fix, forces IE8 into newest possible rendering
+         engine even if it's on an intranet. This has to be defined before any
+         script/style tags. -->
+    <meta http-equiv="X-UA-Compatible" content="IE=edge"> 
+
+    
+      <base href="http://oldzope.rudd-o.com/Rudd-O.com/new-projects/python-audioprocessing/documentation/manuals/algorithms/butterscotch-signatures"><!--[if lt IE 7]></base><![endif]-->
+    
+
+    <title>Butterscotch signatures — Rudd-O.com</title>
+
+  
+  
+    
+    
+    
+    
+  
+
+
+  
+  
+    
+    
+    <meta content="Here's all the information you need to know about Butterscotch." name="DC.description">
+    <meta content="Here's all the information you need to know about Butterscotch." name="description">
+    <meta content="text/html" name="DC.format">
+    <meta content="Page" name="DC.type">
+    <meta content="RuddO" name="DC.creator">
+    <meta content="2008-12-04 12:10:28" name="DC.date.modified">
+    <meta content="2008-12-04 11:54:11" name="DC.date.created">
+    <meta content="en" name="DC.language">
+
+    
+
+    <link rel="shortcut icon" type="image/x-icon" href="http://oldzope.rudd-o.com/Rudd-O.com/favicon.ico">
+
+
+
+    <link rel="home" href="http://oldzope.rudd-o.com/Rudd-O.com" title="Front page">
+
+    <link rel="contents" href="http://oldzope.rudd-o.com/Rudd-O.com/sitemap" title="Site Map">
+
+
+
+
+
+
+    <link rel="search" href="http://oldzope.rudd-o.com/Rudd-O.com/search_form" title="Search this site">
+
+
+
+    <!-- Disable IE6 image toolbar -->
+    <meta http-equiv="imagetoolbar" content="no">
+    
+    
+    
+
+    
+    
+
+    
+    
+
+    
+    
+
+  </head>
+
+  <body class="section-new-projects template-referencemanualpage_view" dir="ltr">
+    <div id="visual-portal-wrapper">
+
+      
+
+      
+
+      <table id="portal-columns">
+        <tbody>
+          <tr>
+            
+            
+            
+
+            
+            <td id="portal-column-content">
+
+              
+                <div class="">
+
+                  
+
+
+                  <div id="region-content" class="documentContent">
+
+                    
+                    
+                    
+                    
+
+                    
+
+    
+
+
+                    
+                    
+
+                    
+                    <div id="content">
+                      
+                      <div>
+                   
+    
+        
+    <h1 class="documentFirstHeading">
+        <img src="http://oldzope.rudd-o.com/Rudd-O.com/referencemanual_icon.gif" alt="" title="Reference manual" height="16" width="16">
+        1.
+        Butterscotch signatures
+    </h1>
+    
+    <a href="http://oldzope.rudd-o.com/Rudd-O.com/new-projects/python-audioprocessing/documentation/manuals/algorithms" class="link-parent">
+        Up one level
+        </a>
+
+    <div class="jumpBox">
+
+    <form method="get" action="http://oldzope.rudd-o.com/Rudd-O.com/new-projects/python-audioprocessing/documentation/manuals/algorithms/butterscotch-signatures">
+        <label for="destination" class="hiddenStructure">Jump to: </label>
+        <select name=":action" onchange="window.location.href=this.options[this.selectedIndex].value">
+	    <option value="referencemanual-all-pages" title="Useful for printing, presentation mode etc.">
+	      All content on one page
+	    </option>
+            <option selected="selected" value="http://oldzope.rudd-o.com/Rudd-O.com/new-projects/python-audioprocessing/documentation/manuals/algorithms/butterscotch-signatures">
+                1.
+                Butterscotch signatures
+            </option>
+        </select>
+        <noscript>
+            &lt;input class="standalone" type="submit"
+                   value="Ir" /&gt;
+        </noscript>
+    </form>
+</div>
+
+    <div class="documentDescription">Here's all the information you need to know about Butterscotch.</div>
+    
+    
+    
+    
+<p>
+A Butterscotch signature consists of at most 30 spectrum analyses, each
+performed on consecutive 4-second blocks of audio, starting from the
+onset of the first 5 dB RMS increase counted computed from 22-sample
+blocks (when using a 44.100 Hz sampling rate).</p>
+<p>Each spectrum analysis reduces each 4-second audio block to 256
+equal-width frequency bands (using a 512-point FFT), then cuts the high
+half of the bands, and finally averages the remaining 128 bands
+logarithmically, to result in 8 log bands from the first significant
+band to 11.025 KHz (the center of the highest frequency band is around
+8.4 KHz). Each sample represents the relative signal amplitude, with
+the reference 0 dB amplitude being equivalent to the value 1.0. Samples
+in the spectrum analysis are not normalized to dB, but instead left
+raw. Chunks supplied to the FFT are windowed by a Hann window.</p>
+<p>As it turns out, the average of the correlation coefficient between
+corresponding bands (across the time domain) among a set of songs is
+surprisingly effective. Identical (non-rolling-start) songs correlate
+almost perfectly regardless of start time differences, encoding bitrate
+or even incompleteness. In contrast, different versions of the same
+song and different songs correlate very weakly or negatively.
+Additionally, the fingerprint has a very useful quality control purpose
+too, as you will see graphically below.</p>
+<p>
+This is a graphical representation output of a spectrum in time -- not a Butterscotch fingerprint, but you get the idea:</p>
+<p align="center"><img class="image-inline" src="Spectrumintime.png" alt="Spectrum in time"></p>
+<p align="left">Butterscotch itself does not work with dB-adjusted values, but the suite can be used to perform spectrum analysis in decibels, in linear
+(equal-width) bands and up to full-spectrum (22 KHz), for spectrum
+plots:</p>
+<p align="center"><img class="image-inline" src="SpectrumintimedBadjusted.png" alt="Spectrum in time (dB-adjusted)"></p>
+<p>
+Additionally, the suite can quantize these decibel-based points to a
+character, and display a character-based table onscreen, in a sort of
+very coarse, horizontal spectrogram.</p>
+<h3 id="Propertiesofthealgorithm">Properties of the algorithm<span class="link-external"><a title="Link to this section" class="anchor" href="http://projects.rudd-o.com/python-audioprocessing/wiki/ButterScotch#Propertiesofthealgorithm"> ¶</a></span></h3>
+<p>
+The algorithm's requirements specify that the algorithm:</p>
+<ul><li>Be robust against different "onsets of audible signal". If two
+different files contain the same song, and one of them has some extra
+silence at the start, that's not a problem.
+</li><li>Be robust against identifying songs with rolling starts. A
+song in a megamix is not conflated with the same song's album / single
+release.
+</li><li>Be robust against lossy compression. The 16~18 KHz lowpass
+algorithm in MP3 does not affect Butterscotch. A song encoded twice
+with different quality settings is reliably identified as the same
+song.
+</li><li>Be robust against incomplete songs. Two copies of the same
+song (one complete, one incomplete) still correlate highly, and you can
+use your music player to weed out the shorter one.
+</li><li>Be fast. A 20.000 song collection needs to be fingerprinted
+efficiently, and posterior analysis of the collection needs to be
+nearly instantaneous. Oops... we're working on that.
+</li></ul>
+<p>
+To accomplish these, the algorithm:</p>
+<ul><li>vectorizes all operations as much as possible,
+</li><li>discards frequencies above 11 KHz,
+</li><li>seeks to onset of audio by identifying the first RMS rise in a very short time frame,
+</li><li>does not perform FFTs until end of audio, but just for two minutes.
+</li></ul>
+<p>The drawback of the algorithm is that it requires an
+explosive (quadratic time) amount of correlations. Finding tracks
+similar to one song is an O(N) operation. However, correlations can be
+computed incredibly quickly (less than a millisecond for a pair of
+signatures) and cached for future on demand use, so for collections
+below 50000 tracks it's not a problem.</p>
+<h3 id="Howwegeneratethesignatures">How we generate the signatures<span class="link-external"><a title="Link to this section" class="anchor" href="http://projects.rudd-o.com/python-audioprocessing/wiki/ButterScotch#Howwegeneratethesignatures"> ¶</a></span></h3>
+<ul><li>Seek to the onset of audio as described above
+</li><li>Generate 30 real FFTs (rfft) for each 4-second-long block
+</li><li>Discard the DC component of the rfft
+</li><li>Discard the highs half of the remainder (the library does not do this by default, but the command line tools do)
+</li><li>Log-average the remaining bands
+</li><li>Return a two-dimensional array
+</li></ul>
+<p>
+This makes it easy to perform frequency- and time-based correlations on the signatures.</p>
+<h3 id="Andwhataboutthename">And what about the name?<span class="link-external"><a title="Link to this section" class="anchor" href="http://projects.rudd-o.com/python-audioprocessing/wiki/ButterScotch#Andwhataboutthename"> ¶</a></span></h3>
+<p>
+It's just a Googleable name.  Get over it.</p>
+<p align="left">&nbsp;</p>
+
+      
+
+    
+
+    
+
+
+</div>
+                    </div>
+                    
+
+                    
+                    
+                      
+    
+
+
+
+
+                    
+                    
+
+                    
+                    
+
+                  </div>
+
+                </div>
+
+              
+            </td>
+            
+
+            
+            
+            
+          </tr>
+        </tbody>
+      </table>
+      
+
+      
+      
+      
+
+      
+
+        
+
+  
+
+
+
+
+      
+
+      
+    </div>
+
+
+
+
+</body></html>
