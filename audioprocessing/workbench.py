@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 import pylab as p
-import matplotlib.axes3d as p3
+import mpl_toolkits.mplot3d.axes3d as p3
 import gdbm
 import numpy
 import cPickle as pickle
@@ -15,9 +15,9 @@ import glob
 def plot_butterscotch_signature(self,title=None,show = True):
 
 		fig=p.figure()
-		ax = p3.Axes3D(fig)
+		ax = p3.Axes3D(fig,azim=0,elev=15)
 
-		if title: ax.text(0,0,title)
+		if title: ax.text(0,0,0,title)
 
 		ax.set_xlabel('Time (s)')
 		if self.linear_bands: ax.set_ylabel('Frequency (%d linear bands)'%len(self.bands))
@@ -33,8 +33,6 @@ def plot_butterscotch_signature(self,title=None,show = True):
 			ys = numpy.array(   fbands   )         # +  [fbands[-1],fbands[0],fbands[0]]   )
 			ax.plot3D(xs, ys , zs)
 
-		ax.set_xlim(xmin=len(self.blocks)*self.secs_per_block,xmax=0)
-		ax.set_ylim(ymin=0,ymax=self.highest_freq)
 		if show: p.show()
 		return fig
 
