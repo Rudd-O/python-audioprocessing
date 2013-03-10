@@ -1,4 +1,10 @@
-= The Python audio processing suite =
+The Python audio processing suite
+=================================
+
+| Donate to support this free software |
+|:------------------------------------:|
+| <img width="164" height="164" title="" alt="" src="doc/bitcoin.png" /> |
+| [1NttJ7op1xxnM5Gg4qd61Gm7y7yxLbG3F5](bitcoin:1NttJ7op1xxnM5Gg4qd61Gm7y7yxLbG3F5) |
 
 This software contains Python modules and command-line tools with a variety of convenience functions to process and visualize audio signals.  For starters, you can easily plot the spectrum of a song, to discriminate among different-quality versions of the same file.  But the real goal of the suite is to automatically identify duplicates.
 
@@ -24,27 +30,11 @@ a matter of minutes, so there's no excuse not to use this software.
 
 == How to get and install it ==
 
-There are three ways you can get Radio jockey:
-
-=== Official, ready-to-install release for your distribution ===
-
-Find it [/radio-jockey/downloads on the releases page].  Install it
-using your distribution's package manager.
-
-=== Official, buildable source package ===
-
-Get the compressed tape archive on [/radio-jockey/downloads on the releases
-page].  Install it using [http://docs.python.org/inst/inst.html Python's distutils].
-
-=== Latest code, directly from our Git repository ===
-
-Clone [/radio-jockey/git/ our Git repository] to get the latest snapshot
-of the source code.  You can [/radio-jockey/browser inspect the repository]
-online too.
+We've moved to https://github.com/Rudd-O/python-audioprocessing
 
 == Help! ==
 
-Sure, we can use the help!  In our Web site:
+Sure, we can use the help!  In the above Web site:
 
  * If you find a bug, please file it using the New Ticket button.
  * If you have patches to contribute, please file a bug too (since we're using Git, chances are we'll be able to pull and push code right from the start).
